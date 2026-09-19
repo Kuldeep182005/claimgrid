@@ -3,7 +3,13 @@ package com.claimgrid.service;
 import com.claimgrid.websocket.GameSessionManager;
 import com.claimgrid.websocket.event.CellClaimedDomainEvent;
 import com.claimgrid.websocket.event.CellClaimedEvent;
+import com.claimgrid.websocket.event.GameFinishedDomainEvent;
+import com.claimgrid.websocket.event.GameFinishedEvent;
+import com.claimgrid.websocket.event.GameStartedDomainEvent;
+import com.claimgrid.websocket.event.GameStartedEvent;
 import com.claimgrid.websocket.event.LeaderboardUpdatedEvent;
+import com.claimgrid.websocket.event.TurnChangedDomainEvent;
+import com.claimgrid.websocket.event.TurnChangedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -13,9 +19,9 @@ import org.springframework.transaction.event.TransactionalEventListener;
 /**
  * Post-commit transaction event listener.
  *
- * Guarantees that CELL_CLAIMED and LEADERBOARD_UPDATED events are dispatched over
- * WebSocket ONLY AFTER the database claim transaction has successfully committed.
- * If the database transaction rolls back, this listener never executes.
+ * Guarantees that battle events (CELL_CLAIMED, TURN_CHANGED, GAME_STARTED, GAME_FINISHED)
+ * are dispatched over WebSocket ONLY AFTER the database claim transaction has successfully committed.
+ * All events are scoped to the specific game session to guarantee game isolation.
  */
 @Component
 public class GameEventListener {
@@ -30,10 +36,11 @@ public class GameEventListener {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCellClaimed(CellClaimedDomainEvent event) {
-        log.debug("Database transaction committed for cell #{}. Broadcasting WebSocket events.", event.cellId());
+        log.debug("Database transaction committed for cell #{}. Broadcasting to game {}.", event.cellId(), event.gameId());
 
-        // 1. Broadcast CELL_CLAIMED
-        sessionManager.broadcast(CellClaimedEvent.builder()
+        // 1. Broadcast CELL_CLAIMED to the game session
+        CellClaimedEvent cellClaimedEvent = CellClaimedEvent.builder()
+                .gameId(event.gameId())
                 .cellId(event.cellId())
                 .x(event.x())
                 .y(event.y())
@@ -41,12 +48,52 @@ public class GameEventListener {
                 .playerName(event.playerName())
                 .color(event.color())
                 .claimedAt(event.claimedAt())
-                .build());
+                .turnNumber(event.turnNumber())
+                .nextPlayerId(event.nextPlayerId())
+                .build();
 
-        // 2. Broadcast LEADERBOARD_UPDATED
-        sessionManager.broadcast(LeaderboardUpdatedEvent.builder()
+        sessionManager.broadcastToGame(event.gameId(), cellClaimedEvent);
+
+        // 2. Broadcast LEADERBOARD_UPDATED to the game session
+        sessionManager.broadcastToGame(event.gameId(), LeaderboardUpdatedEvent.builder()
                 .playerId(event.playerId())
                 .cellsClaimed(event.cellsClaimed())
+                .build());
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onTurnChanged(TurnChangedDomainEvent event) {
+        log.debug("Broadcasting TURN_CHANGED in game {}: nextPlayer={}, turn={}",
+                event.gameId(), event.currentPlayerId(), event.turnNumber());
+
+        sessionManager.broadcastToGame(event.gameId(), TurnChangedEvent.builder()
+                .gameId(event.gameId())
+                .currentPlayerId(event.currentPlayerId())
+                .turnNumber(event.turnNumber())
+                .build());
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onGameStarted(GameStartedDomainEvent event) {
+        log.info("Broadcasting GAME_STARTED in game {} with code {}", event.gameId(), event.code());
+
+        sessionManager.broadcastToGame(event.gameId(), GameStartedEvent.builder()
+                .gameId(event.gameId())
+                .code(event.code())
+                .player1Id(event.player1Id())
+                .player2Id(event.player2Id())
+                .currentPlayerId(event.currentPlayerId())
+                .turnNumber(event.turnNumber())
+                .build());
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onGameFinished(GameFinishedDomainEvent event) {
+        log.info("Broadcasting GAME_FINISHED in game {}: winner={}", event.gameId(), event.winnerId());
+
+        sessionManager.broadcastToGame(event.gameId(), GameFinishedEvent.builder()
+                .gameId(event.gameId())
+                .winnerId(event.winnerId())
                 .build());
     }
 }

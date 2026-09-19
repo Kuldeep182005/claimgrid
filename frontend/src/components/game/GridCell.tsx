@@ -8,6 +8,8 @@ interface GridCellProps {
   ownerColor?: string;
   isCurrentPlayer: boolean;
   isClaiming: boolean;
+  isHighlighted?: boolean;
+  isDimmed?: boolean;
   animationType: 'self' | 'remote' | null;
   onSelect: (id: number) => void;
   onHover: (info: { id: number; x: number; y: number; ownerId: string | null; ownerColor?: string } | null) => void;
@@ -21,6 +23,8 @@ export const GridCell = React.memo(function GridCell({
   ownerColor,
   isCurrentPlayer,
   isClaiming,
+  isHighlighted,
+  isDimmed,
   animationType,
   onSelect,
   onHover,
@@ -62,10 +66,12 @@ export const GridCell = React.memo(function GridCell({
       style={style}
       className={`
         relative aspect-square rounded-[2px] transition-all duration-150 cursor-pointer select-none
-        ${!isClaimed ? 'bg-grid-cell border border-grid-line/50 hover:bg-grid-cell-hover hover:border-accent/80 hover:scale-110 hover:z-10' : ''}
+        ${!isClaimed ? 'bg-grid-cell border border-grid-line/50 hover:bg-grid-cell-hover hover:border-accent/90 hover:scale-110 hover:shadow-[0_0_8px_rgba(99,102,241,0.5)] hover:z-10' : ''}
         ${isClaimed && isCurrentPlayer ? 'ring-1 ring-white/60 hover:brightness-110 hover:scale-105 hover:z-10' : ''}
         ${isClaimed && !isCurrentPlayer ? 'hover:brightness-110 hover:scale-105 hover:z-10' : ''}
-        ${isClaiming ? 'animate-pulse ring-2 ring-accent ring-offset-1 ring-offset-surface z-20' : ''}
+        ${isClaiming ? 'animate-pulse ring-2 ring-accent ring-offset-1 ring-offset-surface z-25 shadow-[0_0_12px_rgba(99,102,241,0.9)]' : ''}
+        ${isHighlighted ? 'ring-2 ring-white brightness-125 scale-110 z-20 shadow-[0_0_12px_rgba(255,255,255,0.85)]' : ''}
+        ${isDimmed ? 'opacity-30 brightness-75' : ''}
         ${animationClass}
       `}
     >

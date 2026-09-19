@@ -3,7 +3,7 @@ import { api } from '../services/api';
 import { sound } from '../services/sound';
 import { useCooldown } from './useCooldown';
 import { useWebSocket } from './useWebSocket';
-import type { Cell } from '../types/game';
+import type { Cell, GameSession } from '../types/game';
 import type { LeaderboardEntry, Player } from '../types/player';
 import type { ServerGameEvent } from '../types/websocket';
 
@@ -15,12 +15,13 @@ export interface ActivityItem {
   color?: string;
 }
 
-export function useGameState(initialPlayer: Player | null) {
+export function useGameState(initialPlayer: Player | null, activeGameId?: string | null) {
   const [player, setPlayer] = useState<Player | null>(initialPlayer);
   const [cells, setCells] = useState<Cell[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [playersMap, setPlayersMap] = useState<Map<string, { username: string; color: string }>>(new Map());
-  const [stats, setStats] = useState({ width: 50, height: 50, totalCells: 2500, claimedCells: 0 });
+  const [stats, setStats] = useState({ width: 25, height: 25, totalCells: 625, claimedCells: 0 });
+  const [battleSession, setBattleSession] = useState<GameSession | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [claimingCellId, setClaimingCellId] = useState<number | null>(null);
   const [onlineCount, setOnlineCount] = useState<number>(1);
@@ -32,11 +33,16 @@ export function useGameState(initialPlayer: Player | null) {
   const { isCooldownActive, getRemainingSeconds, startCooldown } = cooldown;
   const cellsMapRef = useRef<Map<number, Cell>>(new Map());
   const playerRef = useRef<Player | null>(player);
+  const battleSessionRef = useRef<GameSession | null>(battleSession);
   const snapshotRequestIdRef = useRef<number>(0);
 
   useEffect(() => {
     playerRef.current = player;
   }, [player]);
+
+  useEffect(() => {
+    battleSessionRef.current = battleSession;
+  }, [battleSession]);
 
   const addActivity = useCallback((type: ActivityItem['type'], message: string, color?: string) => {
     setActivityFeed((prev) => [
@@ -56,81 +62,106 @@ export function useGameState(initialPlayer: Player | null) {
   const loadSnapshot = useCallback(async () => {
     const requestId = ++snapshotRequestIdRef.current;
     try {
-      const [gameState, lb] = await Promise.all([
-        api.fetchGameState(),
-        api.fetchLeaderboard(50),
-      ]);
+      if (activeGameId) {
+        const battleState = await api.fetchBattleState(activeGameId);
+        if (requestId !== snapshotRequestIdRef.current) return;
 
-      // Discard stale response if a newer snapshot request was initiated in-flight
-      if (requestId !== snapshotRequestIdRef.current) {
-        return;
-      }
-
-      // Reconcile snapshot cells with in-memory cells to protect in-flight WebSocket claims
-      setCells((prevCells) => {
-        const prevMap = new Map(prevCells.map((c) => [c.id, c]));
-
-        const reconciled = gameState.cells.map((snapshotCell) => {
-          const inMemoryCell = prevMap.get(snapshotCell.id);
-          if (!inMemoryCell) {
-            return snapshotCell;
-          }
-
-          // Case A: Cell was claimed via live WebSocket while snapshot HTTP request was in flight
-          if (inMemoryCell.ownerId !== null && snapshotCell.ownerId === null) {
-            return inMemoryCell;
-          }
-
-          // Case B: Both are claimed; check timestamps if available
-          if (inMemoryCell.claimedAt && snapshotCell.claimedAt) {
-            const inMemoryTime = new Date(inMemoryCell.claimedAt).getTime();
-            const snapshotTime = new Date(snapshotCell.claimedAt).getTime();
-            if (inMemoryTime > snapshotTime) {
-              return inMemoryCell;
-            }
-          }
-
-          return snapshotCell;
+        setStats({
+          width: battleState.width,
+          height: battleState.height,
+          totalCells: battleState.totalCells,
+          claimedCells: battleState.claimedCells,
         });
 
-        // Update lookup map
-        const newMap = new Map<number, Cell>();
-        reconciled.forEach((c) => newMap.set(c.id, c));
-        cellsMapRef.current = newMap;
+        const sessionData: GameSession = {
+          gameId: battleState.gameId,
+          code: battleState.code,
+          status: battleState.status,
+          playerCount: battleState.players.length,
+          currentPlayerId: battleState.currentPlayerId,
+          turnNumber: battleState.turnNumber,
+          winnerId: battleState.winnerId,
+          startedAt: battleState.startedAt,
+          finishedAt: battleState.finishedAt,
+          players: battleState.players,
+        };
+        setBattleSession(sessionData);
 
-        // Authoritatively update stats based on reconciled cells
-        const claimedCount = reconciled.filter((c) => c.ownerId !== null).length;
+        // Reconcile cells
+        setCells((prevCells) => {
+          const prevMap = new Map(prevCells.map((c) => [c.id, c]));
+          const reconciled = battleState.cells.map((snapshotCell) => {
+            const inMemoryCell = prevMap.get(snapshotCell.id);
+            if (!inMemoryCell) return snapshotCell;
+            if (inMemoryCell.ownerId !== null && snapshotCell.ownerId === null) return inMemoryCell;
+            return snapshotCell;
+          });
+
+          const newMap = new Map<number, Cell>();
+          reconciled.forEach((c) => newMap.set(c.id, c));
+          cellsMapRef.current = newMap;
+          return reconciled;
+        });
+
+        // Populate players and leaderboard from session players
+        const entries: LeaderboardEntry[] = battleState.players.map((p, idx) => ({
+          id: p.id,
+          username: p.username,
+          color: p.color,
+          cellsClaimed: p.cellsClaimed,
+          currentStreak: 0,
+          rank: idx + 1,
+        }));
+        setLeaderboard(entries);
+
+        setPlayersMap((prev) => {
+          const next = new Map(prev);
+          battleState.players.forEach((p) => next.set(p.id, { username: p.username, color: p.color }));
+          return next;
+        });
+      } else {
+        // Fallback global mode
+        const [gameState, lb] = await Promise.all([
+          api.fetchGameState(),
+          api.fetchLeaderboard(50),
+        ]);
+        if (requestId !== snapshotRequestIdRef.current) return;
+
         setStats({
           width: gameState.width,
           height: gameState.height,
           totalCells: gameState.totalCells,
-          claimedCells: claimedCount,
+          claimedCells: gameState.claimedCells,
         });
 
-        return reconciled;
-      });
-
-      setLeaderboard(lb.entries);
-
-      // Populate players lookup map
-      setPlayersMap((prevMap) => {
-        const pMap = new Map(prevMap);
-        lb.entries.forEach((entry) => {
-          pMap.set(entry.id, { username: entry.username, color: entry.color });
+        setCells((prevCells) => {
+          const prevMap = new Map(prevCells.map((c) => [c.id, c]));
+          const reconciled = gameState.cells.map((snapshotCell) => {
+            const inMemoryCell = prevMap.get(snapshotCell.id);
+            if (!inMemoryCell) return snapshotCell;
+            if (inMemoryCell.ownerId !== null && snapshotCell.ownerId === null) return inMemoryCell;
+            return snapshotCell;
+          });
+          const newMap = new Map<number, Cell>();
+          reconciled.forEach((c) => newMap.set(c.id, c));
+          cellsMapRef.current = newMap;
+          return reconciled;
         });
-        const currentPlayer = playerRef.current;
-        if (currentPlayer) {
-          pMap.set(currentPlayer.id, { username: currentPlayer.username, color: currentPlayer.color });
-        }
-        return pMap;
-      });
+
+        setLeaderboard(lb.entries);
+        setPlayersMap((prev) => {
+          const next = new Map(prev);
+          lb.entries.forEach((entry) => next.set(entry.id, { username: entry.username, color: entry.color }));
+          return next;
+        });
+      }
     } catch (err) {
       console.error('Failed to load authoritative game state:', err);
       showStatus('Failed to connect to game server. Retrying...', 'error');
     } finally {
       setLoading(false);
     }
-  }, [showStatus]);
+  }, [activeGameId, showStatus]);
 
   // Handle incoming real-time WebSocket events
   const handleWebSocketEvent = useCallback((event: ServerGameEvent) => {
@@ -146,7 +177,7 @@ export function useGameState(initialPlayer: Player | null) {
           return next;
         });
 
-        // Synchronize in-memory lookup map immediately
+        // Update in-memory cell map
         const existingInMap = cellsMapRef.current.get(event.cellId);
         if (existingInMap) {
           cellsMapRef.current.set(event.cellId, {
@@ -157,24 +188,32 @@ export function useGameState(initialPlayer: Player | null) {
         }
 
         // Update cell in state
-        setCells((prevCells) => {
-          const updated = [...prevCells];
-          const idx = event.cellId - 1; // 1-indexed cellId matches 0-indexed sorted array
-          if (idx >= 0 && idx < updated.length) {
-            updated[idx] = {
-              ...updated[idx],
-              ownerId: event.playerId,
-              claimedAt: event.claimedAt,
-            };
-          }
-          return updated;
-        });
+        setCells((prevCells) =>
+          prevCells.map((c) =>
+            c.id === event.cellId
+              ? { ...c, ownerId: event.playerId, claimedAt: event.claimedAt }
+              : c
+          )
+        );
 
         // Update stats
         setStats((prev) => ({
           ...prev,
           claimedCells: prev.claimedCells + 1,
         }));
+
+        // Update turn info in session if present
+        if (event.nextPlayerId !== undefined) {
+          setBattleSession((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  currentPlayerId: event.nextPlayerId ?? null,
+                  turnNumber: event.turnNumber ?? prev.turnNumber,
+                }
+              : null
+          );
+        }
 
         // Audio & visual feedback
         setLastClaimAnimation({ cellId: event.cellId, isSelf, timestamp: Date.now() });
@@ -184,12 +223,67 @@ export function useGameState(initialPlayer: Player | null) {
 
         if (!isSelf) {
           sound.playRemoteClaim();
-          addActivity('REMOTE_CLAIM', `${event.playerName} claimed Sector (${event.x}, ${event.y})`, event.color);
+          addActivity('REMOTE_CLAIM', `${event.playerName} captured Sector (${event.x}, ${event.y})`, event.color);
+        } else {
+          setPlayer((prev) => (prev ? { ...prev, cellsClaimed: prev.cellsClaimed + 1 } : null));
         }
+        break;
+      }
 
-        // Update territory count for self if applicable
-        if (isSelf) {
-          setPlayer((prev) => prev ? { ...prev, cellsClaimed: prev.cellsClaimed + 1 } : null);
+      case 'TURN_CHANGED': {
+        setBattleSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                currentPlayerId: event.currentPlayerId,
+                turnNumber: event.turnNumber,
+              }
+            : null
+        );
+        const currentPlayer = playerRef.current;
+        if (currentPlayer && event.currentPlayerId === currentPlayer.id) {
+          sound.playClaimSuccess();
+          showStatus('⚡ YOUR TURN — FIRE CLAIM CANNON', 'success');
+        }
+        break;
+      }
+
+      case 'GAME_STARTED': {
+        setBattleSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: 'ACTIVE',
+                currentPlayerId: event.currentPlayerId,
+                turnNumber: event.turnNumber,
+              }
+            : null
+        );
+        addActivity('JOIN', `Opponent joined! Battle commenced — Turn 1`);
+        sound.playClaimSuccess();
+        showStatus('⚔ BATTLE COMMENCED! All systems online', 'success');
+        break;
+      }
+
+      case 'GAME_FINISHED': {
+        setBattleSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: 'FINISHED',
+                winnerId: event.winnerId,
+              }
+            : null
+        );
+        const currentPlayer = playerRef.current;
+        if (currentPlayer) {
+          if (event.winnerId === currentPlayer.id) {
+            showStatus('🏆 VICTORY! Sector dominance achieved', 'success');
+          } else if (event.winnerId) {
+            showStatus('DEFEAT! Grid secured by rival commander', 'warning');
+          } else {
+            showStatus('STALEMATE — Battle concluded', 'warning');
+          }
         }
         break;
       }
@@ -198,7 +292,6 @@ export function useGameState(initialPlayer: Player | null) {
         setLeaderboard((prevLb) => {
           const existingIndex = prevLb.findIndex((e) => e.id === event.playerId);
           let updated: LeaderboardEntry[];
-
           if (existingIndex >= 0) {
             updated = [...prevLb];
             updated[existingIndex] = {
@@ -206,7 +299,6 @@ export function useGameState(initialPlayer: Player | null) {
               cellsClaimed: event.cellsClaimed,
             };
           } else {
-            // New player entering leaderboard
             const playerInfo = playersMap.get(event.playerId);
             if (playerInfo) {
               updated = [
@@ -224,8 +316,6 @@ export function useGameState(initialPlayer: Player | null) {
               updated = prevLb;
             }
           }
-
-          // Sort descending and re-assign ranks
           return updated
             .sort((a, b) => b.cellsClaimed - a.cellsClaimed)
             .map((entry, idx) => ({ ...entry, rank: idx + 1 }));
@@ -242,7 +332,7 @@ export function useGameState(initialPlayer: Player | null) {
         });
         const currentPlayer = playerRef.current;
         if (currentPlayer && event.playerId !== currentPlayer.id) {
-          addActivity('JOIN', `${event.playerName} entered the grid`, event.color);
+          addActivity('JOIN', `${event.playerName} connected to battle`, event.color);
         }
         break;
       }
@@ -251,16 +341,18 @@ export function useGameState(initialPlayer: Player | null) {
         setOnlineCount((c) => Math.max(1, c - 1));
         const leftPlayer = playersMap.get(event.playerId);
         if (leftPlayer) {
-          addActivity('LEAVE', `${leftPlayer.username} left the grid`);
+          addActivity('LEAVE', `${leftPlayer.username} disconnected`);
+          showStatus('Opponent disconnected — awaiting reconnection', 'warning');
         }
         break;
       }
     }
-  }, [playersMap, addActivity]);
+  }, [playersMap, addActivity, showStatus]);
 
   // Connect WebSocket hook with auto-reconnect and snapshot resync
   const { connectionState, latencyMs } = useWebSocket({
     playerId: player?.id,
+    gameId: activeGameId ?? undefined,
     onEvent: handleWebSocketEvent,
     onReconnect: loadSnapshot,
   });
@@ -273,61 +365,98 @@ export function useGameState(initialPlayer: Player | null) {
   }, [loadSnapshot]);
 
   // Player action: Claim cell
-  // Stable callback: does NOT depend on ticking cooldown or cells array
-  const claimCell = useCallback(async (cellId: number) => {
-    const currentPlayer = playerRef.current;
-    if (!currentPlayer) {
-      showStatus('Join as a player to claim territory', 'warning');
-      return;
-    }
+  const claimCell = useCallback(
+    async (cellId: number) => {
+      const currentPlayer = playerRef.current;
+      if (!currentPlayer) {
+        showStatus('Join as a player to claim territory', 'warning');
+        return;
+      }
 
-    if (isCooldownActive()) {
-      sound.playError();
-      showStatus(`Cooldown active: wait ${getRemainingSeconds()}s`, 'warning');
-      return;
-    }
-
-    const cell = cellsMapRef.current.get(cellId);
-    if (cell && cell.ownerId !== null) {
-      sound.playError();
-      showStatus('Cell is already occupied!', 'warning');
-      return;
-    }
-
-    try {
-      setClaimingCellId(cellId);
-      const res = await api.claimCell(cellId, currentPlayer.id);
-
-      if (res.success) {
-        startCooldown(res.remainingCooldownMs || 3000);
-        sound.playClaimSuccess();
-        showStatus(`Territory secured! Sector (${res.x}, ${res.y})`, 'success');
-        addActivity('CLAIM', `You secured Sector (${res.x}, ${res.y})!`, currentPlayer.color);
-
-        if (res.cellsClaimed !== undefined) {
-          setPlayer((prev) => prev ? { ...prev, cellsClaimed: res.cellsClaimed! } : null);
+      const currentSession = battleSessionRef.current;
+      if (currentSession) {
+        if (currentSession.status === 'WAITING') {
+          sound.playError();
+          showStatus('WAITING FOR OPPONENT TO JOIN', 'warning');
+          return;
         }
-      } else {
-        if (res.status === 'COOLDOWN_ACTIVE') {
-          startCooldown(res.remainingCooldownMs || 1000);
+        if (currentSession.status === 'FINISHED') {
           sound.playError();
-          showStatus(`Cooldown active: please wait ${((res.remainingCooldownMs || 1000) / 1000).toFixed(1)}s`, 'warning');
-        } else if (res.status === 'CELL_ALREADY_CLAIMED') {
+          showStatus('BATTLE FINISHED', 'warning');
+          return;
+        }
+        if (currentSession.currentPlayerId && currentSession.currentPlayerId !== currentPlayer.id) {
           sound.playError();
-          showStatus('Cell was claimed by another player first!', 'error');
-        } else {
-          sound.playError();
-          showStatus(res.message || 'Claim rejected', 'error');
+          showStatus('NOT YOUR TURN — AWAITING OPPONENT MOVE', 'warning');
+          return;
         }
       }
-    } catch (err: unknown) {
-      sound.playError();
-      const errorMsg = err instanceof Error ? err.message : 'Claim failed. Server unreachable.';
-      showStatus(errorMsg, 'error');
-    } finally {
-      setClaimingCellId(null);
-    }
-  }, [isCooldownActive, getRemainingSeconds, startCooldown, showStatus, addActivity]);
+
+      if (isCooldownActive()) {
+        sound.playError();
+        showStatus(`CLAIM COOLDOWN ACTIVE (Wait ${getRemainingSeconds()}s)`, 'warning');
+        return;
+      }
+
+      const cell = cellsMapRef.current.get(cellId);
+      if (cell && cell.ownerId !== null) {
+        sound.playError();
+        showStatus('SECTOR ALREADY CLAIMED', 'warning');
+        return;
+      }
+
+      try {
+        setClaimingCellId(cellId);
+        const res = activeGameId
+          ? await api.claimBattleCell(activeGameId, cellId, currentPlayer.id, battleSessionRef.current?.turnNumber)
+          : await api.claimCell(cellId, currentPlayer.id);
+
+        if (res.success) {
+          startCooldown(res.remainingCooldownMs || 3000);
+          sound.playClaimSuccess();
+          showStatus(`Territory secured! Sector (${res.x}, ${res.y})`, 'success');
+          addActivity('CLAIM', `Sector (${res.x}, ${res.y}) • +1 territory`, currentPlayer.color);
+
+          if (res.cellsClaimed !== undefined) {
+            setPlayer((prev) => (prev ? { ...prev, cellsClaimed: res.cellsClaimed! } : null));
+          }
+          if (res.turnNumber !== undefined) {
+            setBattleSession((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    turnNumber: res.turnNumber!,
+                    currentPlayerId: res.nextPlayerId ?? null,
+                  }
+                : null
+            );
+          }
+        } else {
+          if (res.status === 'COOLDOWN_ACTIVE') {
+            startCooldown(res.remainingCooldownMs || 1000);
+            sound.playError();
+            showStatus(`CLAIM COOLDOWN ACTIVE (Wait ${((res.remainingCooldownMs || 1000) / 1000).toFixed(1)}s)`, 'warning');
+          } else if (res.status === 'NOT_YOUR_TURN') {
+            sound.playError();
+            showStatus('NOT YOUR TURN — AWAITING OPPONENT MOVE', 'warning');
+          } else if (res.status === 'CELL_ALREADY_CLAIMED') {
+            sound.playError();
+            showStatus('SECTOR ALREADY CLAIMED', 'error');
+          } else {
+            sound.playError();
+            showStatus(res.message || 'Claim rejected', 'error');
+          }
+        }
+      } catch (err: unknown) {
+        sound.playError();
+        const errorMsg = err instanceof Error ? err.message : 'Claim failed. Server unreachable.';
+        showStatus(errorMsg, 'error');
+      } finally {
+        setClaimingCellId(null);
+      }
+    },
+    [activeGameId, isCooldownActive, getRemainingSeconds, startCooldown, showStatus, addActivity]
+  );
 
   return {
     player,
@@ -336,6 +465,7 @@ export function useGameState(initialPlayer: Player | null) {
     leaderboard,
     playersMap,
     stats,
+    battleSession,
     loading,
     claimingCellId,
     onlineCount,

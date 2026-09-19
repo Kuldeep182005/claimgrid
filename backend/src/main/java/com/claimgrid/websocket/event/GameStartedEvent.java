@@ -11,10 +11,14 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class PlayerLeftEvent {
+public class GameStartedEvent {
 
     @Builder.Default
-    private String type = "PLAYER_LEFT";
+    private String type = "GAME_STARTED";
     private UUID gameId;
-    private UUID playerId;
+    private String code;
+    private UUID player1Id;
+    private UUID player2Id;
+    private UUID currentPlayerId;
+    private int turnNumber;
 }

@@ -11,10 +11,10 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class PlayerLeftEvent {
+public class GameFinishedEvent {
 
     @Builder.Default
-    private String type = "PLAYER_LEFT";
+    private String type = "GAME_FINISHED";
     private UUID gameId;
-    private UUID playerId;
+    private UUID winnerId;
 }

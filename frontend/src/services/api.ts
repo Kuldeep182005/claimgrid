@@ -1,7 +1,7 @@
-import type { ClaimCellResponse, GameState } from '../types/game';
+import type { ClaimCellResponse, GameSession, GameState, SessionGameState } from '../types/game';
 import type { LeaderboardResponse, Player } from '../types/player';
 
-class ApiError extends Error {
+export class ApiError extends Error {
   public status: number;
 
   constructor(status: number, message: string) {
@@ -55,6 +55,39 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId }),
+    });
+    return handleResponse<ClaimCellResponse>(res);
+  },
+
+  // Battle session endpoints
+  async createGame(playerId: string): Promise<GameSession> {
+    const res = await fetch('/api/games', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId }),
+    });
+    return handleResponse<GameSession>(res);
+  },
+
+  async joinGame(code: string, playerId: string): Promise<GameSession> {
+    const res = await fetch(`/api/games/${encodeURIComponent(code)}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId }),
+    });
+    return handleResponse<GameSession>(res);
+  },
+
+  async fetchBattleState(gameId: string): Promise<SessionGameState> {
+    const res = await fetch(`/api/games/${encodeURIComponent(gameId)}/state`);
+    return handleResponse<SessionGameState>(res);
+  },
+
+  async claimBattleCell(gameId: string, cellId: number, playerId: string, turnNumber?: number): Promise<ClaimCellResponse> {
+    const res = await fetch(`/api/games/${encodeURIComponent(gameId)}/cells/${cellId}/claim`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId, turnNumber }),
     });
     return handleResponse<ClaimCellResponse>(res);
   },

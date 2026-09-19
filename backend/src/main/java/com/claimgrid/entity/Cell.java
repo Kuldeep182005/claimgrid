@@ -6,7 +6,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -17,9 +16,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "cells", uniqueConstraints = {
-        @UniqueConstraint(name = "uq_cells_coordinates", columnNames = {"x", "y"})
-})
+@Table(name = "cells")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -30,6 +27,9 @@ public class Cell {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "session_id")
+    private UUID sessionId;
 
     @Column(nullable = false)
     private int x;

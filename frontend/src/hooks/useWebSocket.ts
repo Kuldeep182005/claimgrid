@@ -3,11 +3,12 @@ import type { ConnectionState, ServerGameEvent } from '../types/websocket';
 
 interface UseWebSocketOptions {
   playerId?: string;
+  gameId?: string;
   onEvent?: (event: ServerGameEvent) => void;
   onReconnect?: () => void;
 }
 
-export function useWebSocket({ playerId, onEvent, onReconnect }: UseWebSocketOptions) {
+export function useWebSocket({ playerId, gameId, onEvent, onReconnect }: UseWebSocketOptions) {
   const [connectionState, setConnectionState] = useState<ConnectionState>('CONNECTING');
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
 
@@ -35,7 +36,10 @@ export function useWebSocket({ playerId, onEvent, onReconnect }: UseWebSocketOpt
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
-    const query = playerId ? `?playerId=${encodeURIComponent(playerId)}` : '';
+    const params = new URLSearchParams();
+    if (playerId) params.set('playerId', playerId);
+    if (gameId) params.set('gameId', gameId);
+    const query = params.toString() ? `?${params.toString()}` : '';
     const url = `${protocol}//${host}/ws/game${query}`;
 
     setConnectionState(wasConnectedRef.current ? 'RECONNECTING' : 'CONNECTING');
@@ -101,7 +105,7 @@ export function useWebSocket({ playerId, onEvent, onReconnect }: UseWebSocketOpt
     ws.onerror = () => {
       // ws.onclose will handle cleanup and reconnection
     };
-  }, [playerId]);
+  }, [playerId, gameId]);
 
   useEffect(() => {
     connectRef.current = connect;

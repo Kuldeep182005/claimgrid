@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { JoinScreen } from './components/Lobby/JoinScreen';
 import { GamePage } from './pages/GamePage';
+import { api } from './services/api';
 import type { Player } from './types/player';
+import type { GameSession } from './types/game';
 
 const STORAGE_KEY = 'claimgrid_player';
+const BATTLE_KEY = 'claimgrid_battle';
 
 function getInitialPlayer(): Player | null {
   try {
@@ -20,33 +23,97 @@ function getInitialPlayer(): Player | null {
   return null;
 }
 
+function getInitialBattle(): GameSession | null {
+  try {
+    const stored = sessionStorage.getItem(BATTLE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored) as GameSession;
+      if (parsed && parsed.gameId) {
+        return parsed;
+      }
+    }
+  } catch {
+    sessionStorage.removeItem(BATTLE_KEY);
+  }
+  return null;
+}
+
 function App() {
   const [player, setPlayer] = useState<Player | null>(getInitialPlayer);
+  const [battle, setBattle] = useState<GameSession | null>(getInitialBattle);
 
-  const handleJoined = (newPlayer: Player) => {
+  // Reconcile stored battle on initial mount
+  useEffect(() => {
+    const battleId = battle?.gameId;
+    if (!battleId) return;
+
+    api.fetchBattleState(battleId)
+      .then((state) => {
+        setBattle({
+          gameId: state.gameId,
+          code: state.code,
+          status: state.status,
+          playerCount: state.players.length,
+          currentPlayerId: state.currentPlayerId,
+          turnNumber: state.turnNumber,
+          winnerId: state.winnerId,
+          startedAt: state.startedAt,
+          finishedAt: state.finishedAt,
+          players: state.players,
+        });
+      })
+      .catch(() => {
+        sessionStorage.removeItem(BATTLE_KEY);
+        setBattle(null);
+      });
+  }, [battle?.gameId]);
+
+  const handleStartBattle = (activePlayer: Player, session: GameSession) => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newPlayer));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(activePlayer));
+      sessionStorage.setItem(BATTLE_KEY, JSON.stringify(session));
     } catch {
       // ignore
     }
-    setPlayer(newPlayer);
+    setPlayer(activePlayer);
+    setBattle(session);
+  };
+
+  const handleReturnToLobby = () => {
+    try {
+      sessionStorage.removeItem(BATTLE_KEY);
+    } catch {
+      // ignore
+    }
+    setBattle(null);
   };
 
   const handleSwitchPlayer = () => {
     try {
       localStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem(BATTLE_KEY);
     } catch {
       // ignore
     }
     setPlayer(null);
+    setBattle(null);
   };
 
   return (
     <>
-      {player ? (
-        <GamePage player={player} onSwitchPlayer={handleSwitchPlayer} />
+      {player && battle ? (
+        <GamePage
+          player={player}
+          battle={battle}
+          onReturnToLobby={handleReturnToLobby}
+          onSwitchPlayer={handleSwitchPlayer}
+        />
       ) : (
-        <JoinScreen onJoined={handleJoined} />
+        <JoinScreen
+          savedPlayer={player}
+          onStartBattle={handleStartBattle}
+          onSwitchPlayer={handleSwitchPlayer}
+        />
       )}
     </>
   );

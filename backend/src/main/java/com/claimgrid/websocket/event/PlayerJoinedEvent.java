@@ -15,6 +15,7 @@ public class PlayerJoinedEvent {
 
     @Builder.Default
     private String type = "PLAYER_JOINED";
+    private UUID gameId;
     private UUID playerId;
     private String playerName;
     private String color;

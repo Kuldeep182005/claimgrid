@@ -1,4 +1,4 @@
-package com.claimgrid.websocket.event;
+package com.claimgrid.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,10 +11,9 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class PlayerLeftEvent {
-
-    @Builder.Default
-    private String type = "PLAYER_LEFT";
-    private UUID gameId;
-    private UUID playerId;
+public class PlayerSummaryDto {
+    private UUID id;
+    private String username;
+    private String color;
+    private int cellsClaimed;
 }

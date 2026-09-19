@@ -16,6 +16,7 @@ public class ClaimCellResponse {
 
     private boolean success;
     private ClaimStatus status;
+    private UUID gameId;
     private Long cellId;
     private int x;
     private int y;
@@ -25,5 +26,7 @@ public class ClaimCellResponse {
     private Instant claimedAt;
     private Integer cellsClaimed;
     private Long remainingCooldownMs;
+    private UUID nextPlayerId;
+    private Integer turnNumber;
     private String message;
 }

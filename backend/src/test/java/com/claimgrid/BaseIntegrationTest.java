@@ -1,6 +1,7 @@
 package com.claimgrid;
 
 import com.claimgrid.repository.CellRepository;
+import com.claimgrid.repository.GameSessionRepository;
 import com.claimgrid.repository.PlayerRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -33,6 +34,9 @@ public abstract class BaseIntegrationTest {
     protected CellRepository cellRepository;
 
     @Autowired
+    protected GameSessionRepository gameSessionRepository;
+
+    @Autowired
     protected PlayerRepository playerRepository;
 
     @Autowired
@@ -40,6 +44,8 @@ public abstract class BaseIntegrationTest {
 
     protected void cleanDatabase() {
         transactionTemplate.execute(status -> {
+            cellRepository.deleteBySessionIdIsNotNull();
+            gameSessionRepository.deleteAll();
             cellRepository.resetAllClaimedCells();
             playerRepository.deleteAll();
             return null;

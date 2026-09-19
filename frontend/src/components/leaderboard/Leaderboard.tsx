@@ -4,11 +4,12 @@ import type { LeaderboardEntry } from '../../types/player';
 interface LeaderboardProps {
   entries: LeaderboardEntry[];
   currentUserId?: string;
+  onHoverPlayer?: (playerId: string | null) => void;
 }
 
-export function Leaderboard({ entries, currentUserId }: LeaderboardProps) {
+export function Leaderboard({ entries, currentUserId, onHoverPlayer }: LeaderboardProps) {
   return (
-    <div className="bg-surface/80 border border-grid-line/80 rounded-2xl p-4 backdrop-blur-md shadow-xl flex flex-col h-full">
+    <div className="bg-surface/80 border border-grid-line/80 hover:border-accent/40 rounded-2xl p-4 backdrop-blur-md shadow-xl flex flex-col h-full transition-all duration-200">
       {/* Header */}
       <div className="flex items-center justify-between pb-3 border-b border-grid-line/60 mb-3">
         <div className="flex items-center gap-2">
@@ -19,13 +20,16 @@ export function Leaderboard({ entries, currentUserId }: LeaderboardProps) {
             LIVE FACTION STANDINGS
           </h2>
         </div>
-        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface-elevated text-text-muted border border-grid-line/50">
-          TOP {entries.length}
+        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface-elevated text-text-muted border border-grid-line/50" title="Hover commander to spotlight territory">
+          SPOTLIGHT ON HOVER
         </span>
       </div>
 
       {/* Ranked List */}
-      <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 max-h-[360px]">
+      <div
+        onMouseLeave={() => onHoverPlayer?.(null)}
+        className="flex-1 overflow-y-auto space-y-1.5 pr-1 max-h-[360px]"
+      >
         {entries.length === 0 ? (
           <div className="text-center py-8 text-xs font-mono text-text-muted">
             No territory claimed yet.
@@ -38,6 +42,7 @@ export function Leaderboard({ entries, currentUserId }: LeaderboardProps) {
               key={entry.id}
               entry={entry}
               isCurrentUser={entry.id === currentUserId}
+              onHover={onHoverPlayer}
             />
           ))
         )}

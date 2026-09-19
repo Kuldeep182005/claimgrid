@@ -1,17 +1,34 @@
 import { useState, useId } from 'react';
 import { api } from '../../services/api';
 import { sound } from '../../services/sound';
+import { HowToPlayModal } from './HowToPlayModal';
+import { PracticeBotsModal } from './PracticeBotsModal';
+import { BattleSelectModal } from './BattleSelectModal';
 import type { Player } from '../../types/player';
+import type { GameSession } from '../../types/game';
 
 interface JoinScreenProps {
-  onJoined: (player: Player) => void;
+  savedPlayer?: Player | null;
+  onStartBattle: (player: Player, session: GameSession) => void;
+  onSwitchPlayer?: () => void;
 }
 
-export function JoinScreen({ onJoined }: JoinScreenProps) {
-  const [username, setUsername] = useState('');
+export function JoinScreen({ savedPlayer, onStartBattle, onSwitchPlayer }: JoinScreenProps) {
+  const [username, setUsername] = useState(savedPlayer?.username ?? '');
+  const [activePlayer, setActivePlayer] = useState<Player | null>(savedPlayer ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isHowToPlayOpen, setIsHowToPlayOpen] = useState(false);
+  const [isPracticeModalOpen, setIsPracticeModalOpen] = useState(false);
+  const [isBattleModalOpen, setIsBattleModalOpen] = useState(false);
   const usernameInputId = useId();
+
+  const [prevSavedPlayer, setPrevSavedPlayer] = useState(savedPlayer);
+  if (savedPlayer !== prevSavedPlayer) {
+    setPrevSavedPlayer(savedPlayer);
+    setUsername(savedPlayer?.username ?? '');
+    setActivePlayer(savedPlayer ?? null);
+  }
 
   // Controlled tactical preview color based on current typed name
   const previewColors = ['#6366F1', '#EC4899', '#10B981', '#F59E0B', '#3B82F6', '#8B5CF6', '#14B8A6'];
@@ -38,11 +55,17 @@ export function JoinScreen({ onJoined }: JoinScreenProps) {
     try {
       setLoading(true);
       setError(null);
-      const player = await api.createPlayer(cleanUsername);
+      let playerToUse: Player;
+      if (savedPlayer && savedPlayer.username.toLowerCase() === cleanUsername.toLowerCase()) {
+        playerToUse = savedPlayer;
+      } else {
+        playerToUse = await api.createPlayer(cleanUsername);
+      }
+      setActivePlayer(playerToUse);
       sound.playClaimSuccess();
-      onJoined(player);
+      setIsBattleModalOpen(true);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to join game';
+      const msg = err instanceof Error ? err.message : 'Failed to initialize commander';
       setError(msg);
       sound.playError();
     } finally {
@@ -69,7 +92,7 @@ export function JoinScreen({ onJoined }: JoinScreenProps) {
             <span className="text-xs font-mono uppercase tracking-widest text-text-muted">GRID NETWORK ONLINE</span>
           </div>
           <span className="text-xs font-mono px-2 py-0.5 rounded bg-surface-elevated text-accent border border-accent/20">
-            50 × 50 SECTORS
+            25 × 25 SECTORS • 625 CELLS
           </span>
         </div>
 
@@ -79,7 +102,7 @@ export function JoinScreen({ onJoined }: JoinScreenProps) {
             CLAIM<span className="text-accent" style={{ color: previewColor }}>GRID</span>
           </h1>
           <p className="mt-2 text-sm text-text-secondary">
-            Real-Time Authoritative Territory War
+            Turn-Based 2-Player Tactical Battlefield
           </p>
         </div>
 
@@ -91,9 +114,9 @@ export function JoinScreen({ onJoined }: JoinScreenProps) {
             </svg>
             Deployment Briefing
           </div>
-          <p>• Every cell is unowned neutral territory.</p>
-          <p>• Server assigns your verified faction color.</p>
-          <p>• Atomic concurrent claims with real-time 3s cooldown.</p>
+          <p>• Private 2-player battles with a short battle code.</p>
+          <p>• Server-authoritative turn engine (alternating moves).</p>
+          <p>• Real-time WebSocket synchronization per session.</p>
         </div>
 
         {/* Form */}
@@ -103,7 +126,18 @@ export function JoinScreen({ onJoined }: JoinScreenProps) {
               <label htmlFor={usernameInputId} className="block text-xs font-mono font-medium text-text-muted uppercase tracking-wider">
                 Commander Call-sign
               </label>
-              <span className="text-xs font-mono text-text-muted">{username.length}/30</span>
+              <div className="flex items-center gap-2">
+                {savedPlayer && onSwitchPlayer && (
+                  <button
+                    type="button"
+                    onClick={onSwitchPlayer}
+                    className="text-[11px] font-mono text-accent hover:underline cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                )}
+                <span className="text-xs font-mono text-text-muted">{username.length}/30</span>
+              </div>
             </div>
 
             <div className="relative">
@@ -137,10 +171,11 @@ export function JoinScreen({ onJoined }: JoinScreenProps) {
             </div>
           )}
 
+          {/* Action Button 1: PLAY MULTIPLAYER (Primary Action) */}
           <button
             type="submit"
             disabled={loading || username.trim().length < 2}
-            className="w-full py-3.5 px-6 rounded-xl font-bold text-sm tracking-wider uppercase bg-accent hover:bg-accent-glow text-white shadow-lg hover:shadow-accent/40 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-3.5 px-6 rounded-xl font-bold text-sm tracking-wider uppercase bg-accent hover:bg-accent-glow text-white shadow-lg hover:shadow-accent/40 active:scale-[0.97] hover:-translate-y-0.5 transition-all duration-150 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
             style={{ backgroundColor: username.trim().length >= 2 ? previewColor : undefined }}
           >
             {loading ? (
@@ -149,26 +184,83 @@ export function JoinScreen({ onJoined }: JoinScreenProps) {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
-                Deploying to Sector...
+                Initializing Commander...
               </>
             ) : (
               <>
-                Enter the Grid
+                ⚔ PLAY MULTIPLAYER
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                 </svg>
               </>
             )}
           </button>
+
+          {/* Supporting Actions: PRACTICE VS BOTS & HOW TO PLAY */}
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => setIsPracticeModalOpen(true)}
+              className="py-2.5 px-3 rounded-xl font-mono font-bold text-xs uppercase tracking-wider bg-surface-elevated/80 hover:bg-surface-elevated border border-grid-line/80 hover:border-accent/60 text-text-secondary hover:text-text-primary shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <svg className="w-3.5 h-3.5 text-warning shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <span className="truncate">🤖 PRACTICE VS BOT</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsHowToPlayOpen(true)}
+              className="py-2.5 px-3 rounded-xl font-mono font-bold text-xs uppercase tracking-wider bg-surface-elevated/80 hover:bg-surface-elevated border border-grid-line/80 hover:border-accent/60 text-text-secondary hover:text-text-primary shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <svg className="w-3.5 h-3.5 text-accent shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="truncate">ℹ HOW TO PLAY</span>
+            </button>
+          </div>
         </form>
 
         {/* Footer */}
         <div className="mt-8 pt-4 border-t border-grid-line/40 text-center">
           <p className="text-[11px] font-mono text-text-muted">
-            PostgreSQL Authoritative • Spring WebSocket Live • 2,500 Cells
+            PostgreSQL Authoritative • Spring WebSocket Live • 625 Cells
           </p>
         </div>
       </div>
+
+      {/* How To Play Modal */}
+      <HowToPlayModal
+        isOpen={isHowToPlayOpen}
+        onClose={() => setIsHowToPlayOpen(false)}
+      />
+
+      {/* Practice vs Bots Architecture Briefing Modal */}
+      <PracticeBotsModal
+        isOpen={isPracticeModalOpen}
+        onClose={() => setIsPracticeModalOpen(false)}
+        onDeployMultiplayer={() => {
+          setIsPracticeModalOpen(false);
+          if (username.trim().length >= 2) {
+            const form = document.querySelector('form');
+            if (form) form.requestSubmit();
+          }
+        }}
+      />
+
+      {/* Battle Select Modal (Create / Join 2-Player Battle) */}
+      {activePlayer && (
+        <BattleSelectModal
+          isOpen={isBattleModalOpen}
+          player={activePlayer}
+          onClose={() => setIsBattleModalOpen(false)}
+          onEnterBattle={(session) => {
+            setIsBattleModalOpen(false);
+            onStartBattle(activePlayer, session);
+          }}
+        />
+      )}
     </div>
   );
 }

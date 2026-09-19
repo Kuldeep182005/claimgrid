@@ -16,6 +16,7 @@ public class CellClaimedEvent {
 
     @Builder.Default
     private String type = "CELL_CLAIMED";
+    private UUID gameId;
     private Long cellId;
     private int x;
     private int y;
@@ -23,4 +24,6 @@ public class CellClaimedEvent {
     private String playerName;
     private String color;
     private Instant claimedAt;
+    private int turnNumber;
+    private UUID nextPlayerId;
 }

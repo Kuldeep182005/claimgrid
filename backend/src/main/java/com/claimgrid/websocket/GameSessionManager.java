@@ -17,8 +17,8 @@ import java.util.concurrent.ConcurrentMap;
 /**
  * Thread-safe WebSocket connection and session registry for ClaimGrid.
  *
- * Manages active sessions, associates sessions with players, isolates send failures,
- * and prunes disconnected sessions without memory leaks.
+ * Scopes WebSocket sessions to specific GameSessions to guarantee full
+ * event isolation between different battles (Part 10).
  */
 @Component
 public class GameSessionManager {
@@ -32,6 +32,10 @@ public class GameSessionManager {
     private final ConcurrentMap<String, UUID> sessionPlayerMap = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, Set<String>> playerSessionsMap = new ConcurrentHashMap<>();
 
+    // Scoped game sessions: gameId -> set of webSocket session IDs
+    private final ConcurrentMap<String, UUID> sessionGameMap = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, Set<String>> gameSessionsMap = new ConcurrentHashMap<>();
+
     private final ObjectMapper objectMapper;
 
     public GameSessionManager(ObjectMapper objectMapper) {
@@ -39,76 +43,121 @@ public class GameSessionManager {
     }
 
     /**
-     * Registers a new connected session, optionally associating it with a player.
-     * The session is wrapped in a ConcurrentWebSocketSessionDecorator to guarantee thread-safe writes.
+     * Registers a new connected session with player and game session scoping.
      */
-    public WebSocketSession registerSession(WebSocketSession session, UUID playerId) {
+    public WebSocketSession registerSession(WebSocketSession session, UUID playerId, UUID gameId) {
         WebSocketSession decorated = new ConcurrentWebSocketSessionDecorator(
                 session, SEND_TIME_LIMIT_MS, BUFFER_SIZE_LIMIT_BYTES);
 
-        sessions.put(session.getId(), decorated);
+        String sessionId = session.getId();
+        sessions.put(sessionId, decorated);
 
         if (playerId != null) {
-            sessionPlayerMap.put(session.getId(), playerId);
-            playerSessionsMap.computeIfAbsent(playerId, k -> ConcurrentHashMap.newKeySet()).add(session.getId());
-            log.info("Registered WebSocket session {} for player {}", session.getId(), playerId);
+            sessionPlayerMap.put(sessionId, playerId);
+            playerSessionsMap.computeIfAbsent(playerId, k -> ConcurrentHashMap.newKeySet()).add(sessionId);
+        }
+
+        if (gameId != null) {
+            sessionGameMap.put(sessionId, gameId);
+            gameSessionsMap.computeIfAbsent(gameId, k -> ConcurrentHashMap.newKeySet()).add(sessionId);
+            log.info("Registered WebSocket session {} for player {} in game {}", sessionId, playerId, gameId);
         } else {
-            log.info("Registered anonymous spectator WebSocket session {}", session.getId());
+            log.info("Registered WebSocket session {} for player {} (unscoped)", sessionId, playerId);
         }
 
         return decorated;
     }
 
+    public WebSocketSession registerSession(WebSocketSession session, UUID playerId) {
+        return registerSession(session, playerId, null);
+    }
+
     /**
-     * Removes a disconnected session.
-     * Returns the player's UUID if this was their last active session (triggering PLAYER_LEFT),
-     * or null if the session was anonymous or the player still has other active sessions.
+     * Removes a disconnected session and cleans up player and game associations.
      */
-    public UUID removeSession(WebSocketSession session) {
+    public SessionRemovalResult removeSession(WebSocketSession session) {
         String sessionId = session.getId();
         sessions.remove(sessionId);
 
+        UUID gameId = sessionGameMap.remove(sessionId);
+        if (gameId != null) {
+            Set<String> gameSessions = gameSessionsMap.get(gameId);
+            if (gameSessions != null) {
+                gameSessions.remove(sessionId);
+                if (gameSessions.isEmpty()) {
+                    gameSessionsMap.remove(gameId);
+                }
+            }
+        }
+
         UUID playerId = sessionPlayerMap.remove(sessionId);
+        boolean lastSessionForPlayer = false;
         if (playerId != null) {
             Set<String> playerSessions = playerSessionsMap.get(playerId);
             if (playerSessions != null) {
                 playerSessions.remove(sessionId);
                 if (playerSessions.isEmpty()) {
                     playerSessionsMap.remove(playerId);
-                    log.info("Session {} closed; player {} has no remaining sessions (will trigger PLAYER_LEFT)", sessionId, playerId);
-                    return playerId;
+                    lastSessionForPlayer = true;
+                    log.info("Session {} closed; player {} has no remaining sessions in game {}", sessionId, playerId, gameId);
                 }
             }
-            log.info("Session {} closed for player {} (player still has other active sessions)", sessionId, playerId);
-        } else {
-            log.info("Anonymous spectator WebSocket session {} closed", sessionId);
         }
 
-        return null;
+        return new SessionRemovalResult(playerId, gameId, lastSessionForPlayer);
+    }
+
+    public record SessionRemovalResult(UUID playerId, UUID gameId, boolean lastSessionForPlayer) {}
+
+    /**
+     * Broadcasts a message ONLY to participants in a specific GameSession (Game Isolation).
+     */
+    public void broadcastToGame(UUID gameId, Object payload) {
+        if (gameId == null) {
+            broadcast(payload);
+            return;
+        }
+
+        Set<String> sessionIds = gameSessionsMap.get(gameId);
+        if (sessionIds == null || sessionIds.isEmpty()) {
+            log.debug("No active WebSocket sessions found for game {}", gameId);
+            return;
+        }
+
+        TextMessage message = serializePayload(payload);
+        if (message == null) return;
+
+        for (String sessionId : sessionIds) {
+            WebSocketSession session = sessions.get(sessionId);
+            if (session == null || !session.isOpen()) {
+                continue;
+            }
+
+            try {
+                session.sendMessage(message);
+            } catch (IOException e) {
+                log.warn("Failed to send WebSocket message to session {} in game {}: {}", sessionId, gameId, e.getMessage());
+                try {
+                    session.close();
+                } catch (Exception ignored) {
+                }
+            }
+        }
     }
 
     /**
-     * Broadcasts a message to all active WebSocket sessions.
-     * Send errors to individual broken sessions are isolated and will not terminate the broadcast
-     * to other clients.
+     * Broadcasts a message globally to all active sessions.
      */
     public void broadcast(Object payload) {
         if (sessions.isEmpty()) {
             return;
         }
 
-        TextMessage message;
-        try {
-            String json = objectMapper.writeValueAsString(payload);
-            message = new TextMessage(json);
-        } catch (Exception e) {
-            log.error("Failed to serialize WebSocket event payload: {}", payload, e);
-            return;
-        }
+        TextMessage message = serializePayload(payload);
+        if (message == null) return;
 
         for (WebSocketSession session : sessions.values()) {
             if (!session.isOpen()) {
-                removeSession(session);
                 continue;
             }
 
@@ -120,13 +169,27 @@ public class GameSessionManager {
                     session.close();
                 } catch (Exception ignored) {
                 }
-                removeSession(session);
             }
+        }
+    }
+
+    private TextMessage serializePayload(Object payload) {
+        try {
+            String json = objectMapper.writeValueAsString(payload);
+            return new TextMessage(json);
+        } catch (Exception e) {
+            log.error("Failed to serialize WebSocket event payload: {}", payload, e);
+            return null;
         }
     }
 
     public int getActiveSessionCount() {
         return sessions.size();
+    }
+
+    public int getActiveGameSessionCount(UUID gameId) {
+        Set<String> set = gameSessionsMap.get(gameId);
+        return set != null ? set.size() : 0;
     }
 
     public boolean isPlayerConnected(UUID playerId) {

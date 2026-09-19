@@ -21,8 +21,8 @@ import java.util.UUID;
 /**
  * Native Spring WebSocket handler for /ws/game.
  *
- * Handles session lifecycle, presence tracking (PLAYER_JOINED / PLAYER_LEFT),
- * ping/pong keepalives, and safely isolates malformed messages without terminating connections.
+ * Scopes connections to game sessions using the query parameter ?playerId=...&gameId=...
+ * to enforce event isolation between battles.
  */
 @Component
 public class GameWebSocketHandler extends TextWebSocketHandler {
@@ -43,23 +43,31 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        UUID playerId = extractPlayerId(session.getUri());
+        UUID playerId = extractUuidParam(session.getUri(), "playerId");
+        UUID gameId = extractUuidParam(session.getUri(), "gameId");
 
         if (playerId != null) {
             Optional<Player> playerOpt = playerRepository.findById(playerId);
             if (playerOpt.isPresent()) {
                 Player player = playerOpt.get();
                 boolean alreadyConnected = sessionManager.isPlayerConnected(playerId);
-                sessionManager.registerSession(session, playerId);
+                sessionManager.registerSession(session, playerId, gameId);
 
-                // Broadcast PLAYER_JOINED only if this is the player's first active connection
+                // Broadcast PLAYER_JOINED scoped to the game session if gameId is present
                 if (!alreadyConnected) {
-                    sessionManager.broadcast(PlayerJoinedEvent.builder()
+                    PlayerJoinedEvent event = PlayerJoinedEvent.builder()
+                            .gameId(gameId)
                             .playerId(player.getId())
                             .playerName(player.getUsername())
                             .color(player.getColor())
-                            .build());
-                    log.info("Broadcasted PLAYER_JOINED for player '{}' ({})", player.getUsername(), playerId);
+                            .build();
+
+                    if (gameId != null) {
+                        sessionManager.broadcastToGame(gameId, event);
+                    } else {
+                        sessionManager.broadcast(event);
+                    }
+                    log.info("Broadcasted PLAYER_JOINED for player '{}' ({}) in game {}", player.getUsername(), playerId, gameId);
                 }
                 return;
             } else {
@@ -67,8 +75,8 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             }
         }
 
-        // Register as spectator if anonymous or player not found
-        sessionManager.registerSession(session, null);
+        // Register as spectator
+        sessionManager.registerSession(session, null, gameId);
     }
 
     @Override
@@ -85,18 +93,24 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             }
         } catch (Exception e) {
             log.warn("Received malformed WebSocket message from session {}: {}", session.getId(), e.getMessage());
-            // Malformed messages are logged and safely ignored without crashing or closing other sessions
         }
     }
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
-        UUID leftPlayerId = sessionManager.removeSession(session);
-        if (leftPlayerId != null) {
-            sessionManager.broadcast(PlayerLeftEvent.builder()
-                    .playerId(leftPlayerId)
-                    .build());
-            log.info("Broadcasted PLAYER_LEFT for player {}", leftPlayerId);
+        GameSessionManager.SessionRemovalResult result = sessionManager.removeSession(session);
+        if (result.lastSessionForPlayer()) {
+            PlayerLeftEvent event = PlayerLeftEvent.builder()
+                    .gameId(result.gameId())
+                    .playerId(result.playerId())
+                    .build();
+
+            if (result.gameId() != null) {
+                sessionManager.broadcastToGame(result.gameId(), event);
+            } else {
+                sessionManager.broadcast(event);
+            }
+            log.info("Broadcasted PLAYER_LEFT for player {} in game {}", result.playerId(), result.gameId());
         }
     }
 
@@ -110,7 +124,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         afterConnectionClosed(session, CloseStatus.SERVER_ERROR);
     }
 
-    private UUID extractPlayerId(URI uri) {
+    private UUID extractUuidParam(URI uri, String paramName) {
         if (uri == null || uri.getQuery() == null) {
             return null;
         }
@@ -118,11 +132,11 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         String query = uri.getQuery();
         for (String param : query.split("&")) {
             String[] pair = param.split("=");
-            if (pair.length == 2 && "playerId".equalsIgnoreCase(pair[0])) {
+            if (pair.length == 2 && paramName.equalsIgnoreCase(pair[0])) {
                 try {
                     return UUID.fromString(pair[1]);
                 } catch (IllegalArgumentException e) {
-                    log.warn("Invalid playerId in WebSocket query string: {}", pair[1]);
+                    log.warn("Invalid {} in WebSocket query string: {}", paramName, pair[1]);
                     return null;
                 }
             }

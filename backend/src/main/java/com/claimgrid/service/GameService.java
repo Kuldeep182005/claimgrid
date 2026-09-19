@@ -27,7 +27,7 @@ public class GameService {
 
     @Transactional(readOnly = true)
     public GameStateResponse getGameState() {
-        List<Cell> cells = cellRepository.findAllByOrderByYAscXAsc();
+        List<Cell> cells = cellRepository.findAllGlobalCellsOrderByYAscXAsc();
 
         long claimedCount = cells.stream()
                 .filter(Cell::isClaimed)
