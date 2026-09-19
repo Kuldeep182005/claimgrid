@@ -10,8 +10,10 @@ import com.claimgrid.exception.InvalidGameRequestException;
 import com.claimgrid.exception.PlayerNotFoundException;
 import com.claimgrid.repository.CellRepository;
 import com.claimgrid.repository.PlayerRepository;
+import com.claimgrid.websocket.event.CellClaimedDomainEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,13 +29,16 @@ public class ClaimService {
     private final CellRepository cellRepository;
     private final PlayerRepository playerRepository;
     private final GameProperties gameProperties;
+    private final ApplicationEventPublisher eventPublisher;
 
     public ClaimService(CellRepository cellRepository,
                         PlayerRepository playerRepository,
-                        GameProperties gameProperties) {
+                        GameProperties gameProperties,
+                        ApplicationEventPublisher eventPublisher) {
         this.cellRepository = cellRepository;
         this.playerRepository = playerRepository;
         this.gameProperties = gameProperties;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -47,7 +52,8 @@ public class ClaimService {
      * 4. Server-side cooldown validation against game.claim.cooldown-ms.
      * 5. Atomic conditional database claim via UPDATE ... WHERE owner_id IS NULL.
      * 6. Atomic territory increment and claim timestamp update on successful claim.
-     * 7. Clean domain-level status outcome returned in ClaimCellResponse.
+     * 7. Publishes CellClaimedDomainEvent to trigger post-commit WebSocket broadcasting.
+     * 8. Clean domain-level status outcome returned in ClaimCellResponse.
      */
     @Transactional
     public ClaimCellResponse claimCell(UUID playerId, Long cellId) {
@@ -100,6 +106,18 @@ public class ClaimService {
 
             log.info("Player '{}' ({}) successfully claimed cell #{} at ({}, {}) [cellsClaimed={}]",
                     player.getUsername(), playerId, cellId, cell.getX(), cell.getY(), newCellsClaimed);
+
+            // Publish domain event for post-commit WebSocket broadcasting
+            eventPublisher.publishEvent(new CellClaimedDomainEvent(
+                    cellId,
+                    cell.getX(),
+                    cell.getY(),
+                    playerId,
+                    player.getUsername(),
+                    player.getColor(),
+                    now,
+                    newCellsClaimed
+            ));
 
             return ClaimCellResponse.builder()
                     .success(true)
