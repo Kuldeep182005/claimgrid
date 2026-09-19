@@ -1,22 +1,55 @@
-import './App.css'
+import { useState } from 'react';
+import { JoinScreen } from './components/Lobby/JoinScreen';
+import { GamePage } from './pages/GamePage';
+import type { Player } from './types/player';
 
-function App() {
-  return (
-    <div className="min-h-screen bg-grid-bg flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-5xl font-bold text-text-primary mb-2 tracking-tight">
-          Claim<span className="text-accent">Grid</span>
-        </h1>
-        <p className="text-text-secondary text-lg">
-          Claim a cell. Build your territory.
-        </p>
-        <div className="mt-8 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-elevated border border-grid-line text-text-muted text-sm">
-          <span className="inline-block w-2 h-2 rounded-full bg-success animate-pulse" />
-          Setting up...
-        </div>
-      </div>
-    </div>
-  )
+const STORAGE_KEY = 'claimgrid_player';
+
+function getInitialPlayer(): Player | null {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored) as Player;
+      if (parsed && parsed.id && parsed.username) {
+        return parsed;
+      }
+    }
+  } catch {
+    localStorage.removeItem(STORAGE_KEY);
+  }
+  return null;
 }
 
-export default App
+function App() {
+  const [player, setPlayer] = useState<Player | null>(getInitialPlayer);
+
+  const handleJoined = (newPlayer: Player) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newPlayer));
+    } catch {
+      // ignore
+    }
+    setPlayer(newPlayer);
+  };
+
+  const handleSwitchPlayer = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+    setPlayer(null);
+  };
+
+  return (
+    <>
+      {player ? (
+        <GamePage player={player} onSwitchPlayer={handleSwitchPlayer} />
+      ) : (
+        <JoinScreen onJoined={handleJoined} />
+      )}
+    </>
+  );
+}
+
+export default App;
