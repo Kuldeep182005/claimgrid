@@ -15,6 +15,7 @@ import java.util.UUID;
 public class ClaimCellResponse {
 
     private boolean success;
+    private ClaimStatus status;
     private Long cellId;
     private int x;
     private int y;
@@ -22,5 +23,7 @@ public class ClaimCellResponse {
     private String ownerUsername;
     private String ownerColor;
     private Instant claimedAt;
+    private Integer cellsClaimed;
+    private Long remainingCooldownMs;
     private String message;
 }

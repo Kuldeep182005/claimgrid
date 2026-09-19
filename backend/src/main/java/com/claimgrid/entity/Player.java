@@ -49,6 +49,9 @@ public class Player {
     @Builder.Default
     private int currentStreak = 0;
 
+    @Column(name = "last_claim_at")
+    private Instant lastClaimAt;
+
     @PrePersist
     public void prePersist() {
         Instant now = Instant.now();

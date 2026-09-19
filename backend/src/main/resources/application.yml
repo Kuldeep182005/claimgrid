@@ -27,3 +27,7 @@ logging:
   level:
     com.claimgrid: DEBUG
     org.springframework.web.socket: INFO
+
+game:
+  claim:
+    cooldown-ms: 3000

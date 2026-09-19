@@ -20,6 +20,7 @@ public class PlayerResponse {
     private String color;
     private Instant createdAt;
     private Instant lastSeenAt;
+    private Instant lastClaimAt;
     private int cellsClaimed;
     private int currentStreak;
 
@@ -30,6 +31,7 @@ public class PlayerResponse {
                 .color(player.getColor())
                 .createdAt(player.getCreatedAt())
                 .lastSeenAt(player.getLastSeenAt())
+                .lastClaimAt(player.getLastClaimAt())
                 .cellsClaimed(player.getCellsClaimed())
                 .currentStreak(player.getCurrentStreak())
                 .build();

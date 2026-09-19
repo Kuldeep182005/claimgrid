@@ -1,6 +1,8 @@
 package com.claimgrid;
 
+import com.claimgrid.config.GameProperties;
 import com.claimgrid.dto.ClaimCellResponse;
+import com.claimgrid.dto.ClaimStatus;
 import com.claimgrid.entity.Cell;
 import com.claimgrid.entity.Player;
 import com.claimgrid.repository.CellRepository;
@@ -32,6 +34,9 @@ class ConcurrentClaimIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private CellRepository cellRepository;
+
+    @Autowired
+    private GameProperties gameProperties;
 
     @BeforeEach
     void setUp() {
@@ -101,8 +106,10 @@ class ConcurrentClaimIntegrationTest extends BaseIntegrationTest {
             if (result.isSuccess()) {
                 successCount.incrementAndGet();
                 winningPlayerId = result.getOwnerId();
+                assertThat(result.getStatus()).isEqualTo(ClaimStatus.SUCCESS);
             } else {
                 rejectedCount.incrementAndGet();
+                assertThat(result.getStatus()).isEqualTo(ClaimStatus.CELL_ALREADY_CLAIMED);
             }
         }
 
@@ -134,6 +141,9 @@ class ConcurrentClaimIntegrationTest extends BaseIntegrationTest {
         assertThat(winningPlayer.getCellsClaimed())
                 .as("Winning player's cellsClaimed must be exactly 1")
                 .isEqualTo(1);
+        assertThat(winningPlayer.getLastClaimAt())
+                .as("Winning player's lastClaimAt must be recorded")
+                .isNotNull();
 
         for (Player contender : players) {
             if (!contender.getId().equals(winningPlayerId)) {
@@ -141,16 +151,19 @@ class ConcurrentClaimIntegrationTest extends BaseIntegrationTest {
                 assertThat(loser.getCellsClaimed())
                         .as("Losing player %s cellsClaimed must remain 0", loser.getUsername())
                         .isEqualTo(0);
+                assertThat(loser.getLastClaimAt())
+                        .as("Losing player %s lastClaimAt must remain null", loser.getUsername())
+                        .isNull();
             }
         }
     }
 
     @Test
-    @DisplayName("Section 26: Simultaneous claims by the SAME player on 20 DIFFERENT cells must not lose increments")
-    void testConcurrentClaimsBySamePlayer_NoLostStatisticsUpdates() throws Exception {
+    @DisplayName("Section 24 & 26: 20 simultaneous claims on DIFFERENT cells by the SAME player must enforce cooldown: exactly ONE succeeds, 19 rejected")
+    void testConcurrentClaimsBySamePlayer_CooldownEnforcesSingleSuccess() throws Exception {
         int cellCount = 20;
 
-        // 1. Create a single player
+        // 1. Create a single player with no previous claim
         Instant now = Instant.now();
         Player player = playerRepository.save(Player.builder()
                 .username("RapidClaimer")
@@ -162,7 +175,7 @@ class ConcurrentClaimIntegrationTest extends BaseIntegrationTest {
                 .build());
         UUID playerId = player.getId();
 
-        // 2. Select 20 distinct unowned cells (e.g. coordinates (20, 0) through (20, 19))
+        // 2. Select 20 distinct unowned cells (coordinates (20, 0) through (20, 19))
         List<Long> cellIds = new ArrayList<>();
         for (int y = 0; y < cellCount; y++) {
             final int targetY = y;
@@ -195,26 +208,44 @@ class ConcurrentClaimIntegrationTest extends BaseIntegrationTest {
         assertThat(allReady).isTrue();
         startLatch.countDown(); // FIRE ALL 20 CLAIMS SIMULTANEOUSLY
 
-        // 4. Verify all 20 claims succeeded
+        // 4. Gather results: exactly 1 must succeed, 19 must be rejected due to COOLDOWN_ACTIVE
+        int successCount = 0;
+        int cooldownRejectedCount = 0;
+
         for (Future<ClaimCellResponse> future : futures) {
             ClaimCellResponse result = future.get(15, TimeUnit.SECONDS);
-            assertThat(result.isSuccess()).isTrue();
-            assertThat(result.getOwnerId()).isEqualTo(playerId);
+            if (result.isSuccess()) {
+                successCount++;
+                assertThat(result.getStatus()).isEqualTo(ClaimStatus.SUCCESS);
+                assertThat(result.getOwnerId()).isEqualTo(playerId);
+            } else {
+                cooldownRejectedCount++;
+                assertThat(result.getStatus()).isEqualTo(ClaimStatus.COOLDOWN_ACTIVE);
+                assertThat(result.getRemainingCooldownMs()).isGreaterThan(0L);
+            }
         }
 
         executor.shutdown();
         executor.awaitTermination(5, TimeUnit.SECONDS);
 
-        // 5. Verify authoritative database statistics: NO LOST UPDATES
+        assertThat(successCount)
+                .as("Only the initial claim must succeed before cooldown activates")
+                .isEqualTo(1);
+        assertThat(cooldownRejectedCount)
+                .as("All simultaneous subsequent claims by the same player must be rejected by cooldown")
+                .isEqualTo(cellCount - 1);
+
+        // 5. Verify authoritative database statistics: territory count is strictly 1
         Player updatedPlayer = playerRepository.findById(playerId).orElseThrow();
         assertThat(updatedPlayer.getCellsClaimed())
-                .as("cellsClaimed must be exactly 20 after 20 concurrent claims (no lost updates)")
-                .isEqualTo(20);
+                .as("cellsClaimed must be exactly 1 (server-side cooldown prevents double increments)")
+                .isEqualTo(1);
+        assertThat(updatedPlayer.getLastClaimAt()).isNotNull();
 
-        // 6. Verify count of owned cells directly in cells table
+        // 6. Verify count of owned cells in cells table is exactly 1
         long actualOwnedCount = cellRepository.countByOwnerId(playerId);
         assertThat(actualOwnedCount)
-                .as("cells table actual row count owned by player must equal 20")
-                .isEqualTo(20);
+                .as("cells table actual row count owned by player must equal 1")
+                .isEqualTo(1);
     }
 }
