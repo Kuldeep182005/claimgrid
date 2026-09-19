@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+/* ================================
+   ClaimGrid — Design System
+   ================================ */
+
+@theme {
+  --color-grid-bg: #0f0f1a;
+  --color-grid-line: #1e1e3a;
+  --color-grid-cell: #16162a;
+  --color-grid-cell-hover: #252550;
+  --color-surface: #12121f;
+  --color-surface-elevated: #1a1a30;
+  --color-accent: #7c3aed;
+  --color-accent-glow: #a78bfa;
+  --color-success: #22c55e;
+  --color-danger: #ef4444;
+  --color-warning: #f59e0b;
+  --color-text-primary: #f1f1f7;
+  --color-text-secondary: #9ca3af;
+  --color-text-muted: #6b7280;
+}

@@ -1,0 +1,16 @@
+# Docker Compose override for local development
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up db
+#    or: docker compose up db  (if this file is renamed to docker-compose.override.yml)
+#
+# Starts only PostgreSQL. Run backend and frontend with their dev servers:
+#   Backend:  cd backend && mvn spring-boot:run
+#   Frontend: cd frontend && npm run dev
+
+services:
+  backend:
+    profiles:
+      - full
+
+  frontend:
+    profiles:
+      - full

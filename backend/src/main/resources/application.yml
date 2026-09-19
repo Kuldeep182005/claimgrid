@@ -1,0 +1,29 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: claimgrid
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/claimgrid
+    username: claimgrid
+    password: claimgrid
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+logging:
+  level:
+    com.claimgrid: DEBUG
+    org.springframework.web.socket: INFO
