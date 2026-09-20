@@ -29,6 +29,8 @@ logging:
     org.springframework.web.socket: INFO
 
 game:
+  cors:
+    allowed-origins: ${GAME_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
   claim:
     cooldown-ms: 3000
     match-turn-limit: 40
