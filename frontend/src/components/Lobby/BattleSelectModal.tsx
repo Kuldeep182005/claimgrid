@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../../services/api';
 import { sound } from '../../services/sound';
+import { getWsBaseUrl } from '../../config';
 import type { GameSession } from '../../types/game';
 import type { Player } from '../../types/player';
 import type { ServerGameEvent } from '../../types/websocket';
@@ -72,9 +73,8 @@ export function BattleSelectModal({ isOpen, player, onClose, onEnterBattle }: Ba
       sound.playClaimSuccess();
 
       // Connect WebSocket to wait for all players
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.host;
-      const wsUrl = `${protocol}//${host}/ws/game?playerId=${player.id}&gameId=${session.gameId}`;
+      const wsBase = getWsBaseUrl();
+      const wsUrl = `${wsBase}/ws/game?playerId=${player.id}&gameId=${session.gameId}`;
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 

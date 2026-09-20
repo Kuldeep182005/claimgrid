@@ -1,5 +1,6 @@
 import type { ClaimCellResponse, GameSession, GameState, SessionGameState } from '../types/game';
 import type { LeaderboardResponse, Player } from '../types/player';
+import { buildApiUrl } from '../config';
 
 export class ApiError extends Error {
   public status: number;
@@ -30,7 +31,7 @@ async function handleResponse<T>(res: Response): Promise<T> {
 
 export const api = {
   async createPlayer(username: string): Promise<Player> {
-    const res = await fetch('/api/players', {
+    const res = await fetch(buildApiUrl('/api/players'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username }),
@@ -39,22 +40,22 @@ export const api = {
   },
 
   async getPlayer(id: string): Promise<Player> {
-    const res = await fetch(`/api/players/${id}`);
+    const res = await fetch(buildApiUrl(`/api/players/${id}`));
     return handleResponse<Player>(res);
   },
 
   async fetchGameState(): Promise<GameState> {
-    const res = await fetch('/api/game/state');
+    const res = await fetch(buildApiUrl('/api/game/state'));
     return handleResponse<GameState>(res);
   },
 
   async fetchLeaderboard(limit = 20): Promise<LeaderboardResponse> {
-    const res = await fetch(`/api/leaderboard?limit=${limit}`);
+    const res = await fetch(buildApiUrl(`/api/leaderboard?limit=${limit}`));
     return handleResponse<LeaderboardResponse>(res);
   },
 
   async claimCell(cellId: number, playerId: string): Promise<ClaimCellResponse> {
-    const res = await fetch(`/api/game/cells/${cellId}/claim`, {
+    const res = await fetch(buildApiUrl(`/api/game/cells/${cellId}/claim`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId }),
@@ -64,7 +65,7 @@ export const api = {
 
   // Battle session endpoints
   async createGame(playerId: string, maxPlayers: number = 2): Promise<GameSession> {
-    const res = await fetch('/api/games', {
+    const res = await fetch(buildApiUrl('/api/games'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId, maxPlayers }),
@@ -73,7 +74,7 @@ export const api = {
   },
 
   async createPracticeGame(playerId: string): Promise<GameSession> {
-    const res = await fetch('/api/games/practice', {
+    const res = await fetch(buildApiUrl('/api/games/practice'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId }),
@@ -82,7 +83,7 @@ export const api = {
   },
 
   async endPracticeGame(gameId: string, playerId: string): Promise<void> {
-    const res = await fetch(`/api/games/practice/${encodeURIComponent(gameId)}`, {
+    const res = await fetch(buildApiUrl(`/api/games/practice/${encodeURIComponent(gameId)}`), {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId }),
@@ -93,7 +94,7 @@ export const api = {
   },
 
   async joinGame(code: string, playerId: string): Promise<GameSession> {
-    const res = await fetch(`/api/games/${encodeURIComponent(code)}/join`, {
+    const res = await fetch(buildApiUrl(`/api/games/${encodeURIComponent(code)}/join`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId }),
@@ -102,12 +103,12 @@ export const api = {
   },
 
   async fetchBattleState(gameId: string): Promise<SessionGameState> {
-    const res = await fetch(`/api/games/${encodeURIComponent(gameId)}/state`);
+    const res = await fetch(buildApiUrl(`/api/games/${encodeURIComponent(gameId)}/state`));
     return handleResponse<SessionGameState>(res);
   },
 
   async claimBattleCell(gameId: string, cellId: number, playerId: string, turnNumber?: number): Promise<ClaimCellResponse> {
-    const res = await fetch(`/api/games/${encodeURIComponent(gameId)}/cells/${cellId}/claim`, {
+    const res = await fetch(buildApiUrl(`/api/games/${encodeURIComponent(gameId)}/cells/${cellId}/claim`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId, turnNumber }),
@@ -116,7 +117,7 @@ export const api = {
   },
 
   async attackBattleCell(gameId: string, cellId: number, playerId: string, turnNumber?: number): Promise<ClaimCellResponse> {
-    const res = await fetch(`/api/games/${encodeURIComponent(gameId)}/cells/${cellId}/attack`, {
+    const res = await fetch(buildApiUrl(`/api/games/${encodeURIComponent(gameId)}/cells/${cellId}/attack`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId, turnNumber }),

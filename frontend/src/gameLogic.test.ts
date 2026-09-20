@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import type { Cell } from './types/game.ts';
 import type { LeaderboardEntry } from './types/player.ts';
 import type { CellClaimedEvent, LeaderboardUpdatedEvent, PlayerJoinedEvent, PlayerLeftEvent } from './types/websocket.ts';
+import { buildApiUrl, buildWsUrl, resolveApiBaseUrl, resolveWsBaseUrl, sanitizeBaseUrl } from './config.ts';
 
 describe('ClaimGrid Phase 5 & 6 — Frontend Logic & Interaction System', () => {
 
@@ -403,5 +404,78 @@ describe('ClaimGrid Phase 5 & 6 — Frontend Logic & Interaction System', () => 
     assert.equal(ranked[2].score, 24);
     assert.equal(ranked[3].username, 'Kai', '4th place');
     assert.equal(ranked[3].score, 18);
+  });
+
+  /* ==================================================
+   * PHASE 9: VERCEL/RENDER ENVIRONMENT CONFIGURATION TESTS
+   * ================================================== */
+
+  it('19. REST API base URL configuration, local fallback, and double-slash prevention', () => {
+    // A. Local fallback when VITE_API_BASE_URL is unset/empty
+    assert.equal(resolveApiBaseUrl(''), '');
+    assert.equal(resolveApiBaseUrl(undefined), '');
+    assert.equal(buildApiUrl('/api/game/state', ''), '/api/game/state');
+    assert.equal(buildApiUrl('/api/players', ''), '/api/players');
+    assert.equal(buildApiUrl('api/games', ''), '/api/games');
+
+    // B. Production configuration with Render URL
+    const renderBase = 'https://claimgrid-m3af.onrender.com';
+    assert.equal(resolveApiBaseUrl(renderBase), renderBase);
+    assert.equal(
+      buildApiUrl('/api/game/state', renderBase),
+      'https://claimgrid-m3af.onrender.com/api/game/state'
+    );
+    assert.equal(
+      buildApiUrl('/api/players', renderBase),
+      'https://claimgrid-m3af.onrender.com/api/players'
+    );
+    assert.equal(
+      buildApiUrl('/api/games', renderBase),
+      'https://claimgrid-m3af.onrender.com/api/games'
+    );
+
+    // C. Trailing slash and double-slash prevention
+    const trailingSlashBase = 'https://claimgrid-m3af.onrender.com/';
+    const sanitized = sanitizeBaseUrl(trailingSlashBase);
+    assert.equal(sanitized, 'https://claimgrid-m3af.onrender.com');
+    assert.equal(
+      buildApiUrl('/api/game/state', sanitized),
+      'https://claimgrid-m3af.onrender.com/api/game/state'
+    );
+    assert.ok(!buildApiUrl('/api/game/state', sanitized).includes('//api'));
+  });
+
+  it('20. WebSocket base URL configuration, local fallback, and double-slash prevention', () => {
+    // A. Production configuration with Render wss:// URL
+    const renderWsBase = 'wss://claimgrid-m3af.onrender.com';
+    assert.equal(resolveWsBaseUrl(renderWsBase), renderWsBase);
+
+    const prodWsUrl = buildWsUrl('/ws/game', { playerId: 'player-1', gameId: 'game-42' }, renderWsBase);
+    assert.equal(
+      prodWsUrl,
+      'wss://claimgrid-m3af.onrender.com/ws/game?playerId=player-1&gameId=game-42'
+    );
+    assert.ok(!prodWsUrl.includes('//ws'));
+
+    // B. Trailing slash normalization
+    const trailingWsBase = sanitizeBaseUrl('wss://claimgrid-m3af.onrender.com//');
+    assert.equal(trailingWsBase, 'wss://claimgrid-m3af.onrender.com');
+    const cleanTrailingUrl = buildWsUrl('/ws/game', { playerId: 'p1' }, trailingWsBase);
+    assert.equal(cleanTrailingUrl, 'wss://claimgrid-m3af.onrender.com/ws/game?playerId=p1');
+
+    // C. Local fallback behavior using window.location mock
+    const localHttpLoc = { protocol: 'http:', host: 'localhost:3000' };
+    assert.equal(resolveWsBaseUrl('', localHttpLoc), 'ws://localhost:3000');
+    assert.equal(
+      buildWsUrl('/ws/game', { playerId: 'p1' }, resolveWsBaseUrl('', localHttpLoc)),
+      'ws://localhost:3000/ws/game?playerId=p1'
+    );
+
+    const localHttpsLoc = { protocol: 'https:', host: 'localhost:3000' };
+    assert.equal(resolveWsBaseUrl('', localHttpsLoc), 'wss://localhost:3000');
+    assert.equal(
+      buildWsUrl('/ws/game', undefined, resolveWsBaseUrl('', localHttpsLoc)),
+      'wss://localhost:3000/ws/game'
+    );
   });
 });

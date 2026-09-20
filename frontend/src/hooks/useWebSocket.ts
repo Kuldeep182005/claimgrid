@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { ConnectionState, ServerGameEvent } from '../types/websocket';
+import { getWsBaseUrl } from '../config';
 
 interface UseWebSocketOptions {
   playerId?: string;
@@ -34,13 +35,12 @@ export function useWebSocket({ playerId, gameId, onEvent, onReconnect }: UseWebS
       return;
     }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
+    const wsBase = getWsBaseUrl();
     const params = new URLSearchParams();
     if (playerId) params.set('playerId', playerId);
     if (gameId) params.set('gameId', gameId);
     const query = params.toString() ? `?${params.toString()}` : '';
-    const url = `${protocol}//${host}/ws/game${query}`;
+    const url = `${wsBase}/ws/game${query}`;
 
     setConnectionState(wasConnectedRef.current ? 'RECONNECTING' : 'CONNECTING');
 
