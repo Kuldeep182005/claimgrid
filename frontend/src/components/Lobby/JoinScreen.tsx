@@ -73,6 +73,35 @@ export function JoinScreen({ savedPlayer, onStartBattle, onSwitchPlayer }: JoinS
     }
   };
 
+  const handleStartPractice = async () => {
+    const cleanUsername = username.trim();
+    if (cleanUsername.length < 2 || cleanUsername.length > 30 || !/^[a-zA-Z0-9_.-]+$/.test(cleanUsername)) {
+      setIsPracticeModalOpen(false);
+      setError('Enter a valid commander call-sign before starting practice');
+      sound.playError();
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      const playerToUse = savedPlayer && savedPlayer.username.toLowerCase() === cleanUsername.toLowerCase()
+        ? savedPlayer
+        : await api.createPlayer(cleanUsername);
+      const session = await api.createPracticeGame(playerToUse.id);
+      setActivePlayer(playerToUse);
+      setIsPracticeModalOpen(false);
+      sound.playClaimSuccess();
+      onStartBattle(playerToUse, session);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to start practice battle';
+      setError(msg);
+      sound.playError();
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="relative min-h-screen bg-grid-bg flex items-center justify-center p-4 overflow-hidden tactical-scanline">
       {/* Background ambient grid graphics */}
@@ -240,6 +269,7 @@ export function JoinScreen({ savedPlayer, onStartBattle, onSwitchPlayer }: JoinS
       <PracticeBotsModal
         isOpen={isPracticeModalOpen}
         onClose={() => setIsPracticeModalOpen(false)}
+        onStartPractice={() => void handleStartPractice()}
         onDeployMultiplayer={() => {
           setIsPracticeModalOpen(false);
           if (username.trim().length >= 2) {

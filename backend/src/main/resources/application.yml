@@ -31,3 +31,11 @@ logging:
 game:
   claim:
     cooldown-ms: 3000
+    match-turn-limit: 40
+    chat-rate-limit-ms: 1000
+    reaction-rate-limit-ms: 500
+  bot:
+    player-target-weight: 0.65
+    own-target-weight: 0.20
+    random-target-weight: 0.15
+    target-radius: 2

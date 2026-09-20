@@ -56,9 +56,13 @@ function App() {
           playerCount: state.players.length,
           currentPlayerId: state.currentPlayerId,
           turnNumber: state.turnNumber,
+          turnLimit: state.turnLimit,
+          player1Score: state.player1Score,
+          player2Score: state.player2Score,
           winnerId: state.winnerId,
           startedAt: state.startedAt,
           finishedAt: state.finishedAt,
+          practice: state.practice,
           players: state.players,
         });
       })
@@ -79,7 +83,14 @@ function App() {
     setBattle(session);
   };
 
-  const handleReturnToLobby = () => {
+  const handleReturnToLobby = async () => {
+    if (battle?.practice && player) {
+      try {
+        await api.endPracticeGame(battle.gameId, player.id);
+      } catch (error: unknown) {
+        console.error('Failed to stop practice battle:', error);
+      }
+    }
     try {
       sessionStorage.removeItem(BATTLE_KEY);
     } catch {

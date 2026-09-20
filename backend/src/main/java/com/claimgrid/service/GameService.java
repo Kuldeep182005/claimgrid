@@ -4,6 +4,7 @@ import com.claimgrid.dto.CellResponse;
 import com.claimgrid.dto.GameStateResponse;
 import com.claimgrid.entity.Cell;
 import com.claimgrid.repository.CellRepository;
+import com.claimgrid.websocket.GameSessionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -20,9 +21,11 @@ public class GameService {
     public static final int GRID_HEIGHT = 50;
 
     private final CellRepository cellRepository;
+    private final GameSessionManager sessionManager;
 
-    public GameService(CellRepository cellRepository) {
+    public GameService(CellRepository cellRepository, GameSessionManager sessionManager) {
         this.cellRepository = cellRepository;
+        this.sessionManager = sessionManager;
     }
 
     @Transactional(readOnly = true)
@@ -45,6 +48,7 @@ public class GameService {
                 .totalCells(cells.size())
                 .claimedCells(claimedCount)
                 .cells(cellResponses)
+                .onlineCount(sessionManager.getOnlinePlayerCount())
                 .build();
     }
 }

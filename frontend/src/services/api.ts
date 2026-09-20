@@ -22,6 +22,9 @@ async function handleResponse<T>(res: Response): Promise<T> {
     }
     throw new ApiError(res.status, errorMsg);
   }
+  if (res.status === 204) {
+    return undefined as T;
+  }
   return res.json() as Promise<T>;
 }
 
@@ -60,13 +63,33 @@ export const api = {
   },
 
   // Battle session endpoints
-  async createGame(playerId: string): Promise<GameSession> {
+  async createGame(playerId: string, maxPlayers: number = 2): Promise<GameSession> {
     const res = await fetch('/api/games', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId, maxPlayers }),
+    });
+    return handleResponse<GameSession>(res);
+  },
+
+  async createPracticeGame(playerId: string): Promise<GameSession> {
+    const res = await fetch('/api/games/practice', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId }),
     });
     return handleResponse<GameSession>(res);
+  },
+
+  async endPracticeGame(gameId: string, playerId: string): Promise<void> {
+    const res = await fetch(`/api/games/practice/${encodeURIComponent(gameId)}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId }),
+    });
+    if (!res.ok) {
+      await handleResponse<unknown>(res);
+    }
   },
 
   async joinGame(code: string, playerId: string): Promise<GameSession> {
@@ -85,6 +108,15 @@ export const api = {
 
   async claimBattleCell(gameId: string, cellId: number, playerId: string, turnNumber?: number): Promise<ClaimCellResponse> {
     const res = await fetch(`/api/games/${encodeURIComponent(gameId)}/cells/${cellId}/claim`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId, turnNumber }),
+    });
+    return handleResponse<ClaimCellResponse>(res);
+  },
+
+  async attackBattleCell(gameId: string, cellId: number, playerId: string, turnNumber?: number): Promise<ClaimCellResponse> {
+    const res = await fetch(`/api/games/${encodeURIComponent(gameId)}/cells/${cellId}/attack`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId, turnNumber }),

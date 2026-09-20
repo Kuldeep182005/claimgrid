@@ -14,4 +14,11 @@ public class CreateGameRequest {
 
     @NotNull(message = "Player ID is required")
     private UUID playerId;
+
+    private Integer maxPlayers;
+
+    public CreateGameRequest(UUID playerId) {
+        this.playerId = playerId;
+        this.maxPlayers = 2;
+    }
 }

@@ -4,6 +4,7 @@ import { GameBoard } from '../components/game/GameBoard';
 import { TacticalHUD } from '../components/game/TacticalHUD';
 import { Leaderboard } from '../components/leaderboard/Leaderboard';
 import { ActivityFeed } from '../components/game/ActivityFeed';
+import { CommsPanel } from '../components/game/CommsPanel';
 import { HowToPlayModal } from '../components/Lobby/HowToPlayModal';
 import { GameEndOverlay } from '../components/game/GameEndOverlay';
 import { useGameState } from '../hooks/useGameState';
@@ -38,12 +39,21 @@ export function GamePage({ player, battle, onReturnToLobby, onSwitchPlayer }: Ga
     cooldown,
     claimCell,
     reloadState,
+    chatMessages,
+    reactionAnimation,
+    sendChatMessage,
+    sendReaction,
   } = useGameState(player, battle?.gameId);
 
   const currentSession = battleSession ?? battle ?? null;
   const isMyTurn = currentSession
     ? currentSession.status === 'ACTIVE' && currentSession.currentPlayerId === player.id
     : true;
+
+  const activePlayerName = currentSession?.currentPlayerId
+    ? playersMap.get(currentSession.currentPlayerId)?.username ??
+      currentSession.players?.find((p) => p.id === currentSession.currentPlayerId)?.username
+    : undefined;
 
   const currentUserRank = leaderboard.find((e) => e.id === player.id)?.rank;
 
@@ -131,17 +141,15 @@ export function GamePage({ player, battle, onReturnToLobby, onSwitchPlayer }: Ga
               highlightedOwnerId={hoveredPlayerId}
               isMyTurn={isMyTurn}
               gameStatus={currentSession?.status}
+              activePlayerName={activePlayerName}
+              playerCount={currentSession?.players?.length ?? 1}
+              maxPlayers={currentSession?.maxPlayers ?? 2}
               onClaimCell={claimCell}
             />
           )}
-
-          {/* Floating Real-Time Activity Feed at bottom-left */}
-          <aside className="absolute bottom-5 left-5 z-20 max-w-xs hidden sm:block" aria-label="Live Telemetry Feed">
-            <ActivityFeed items={activityFeed} />
-          </aside>
         </section>
 
-        {/* Tactical Control Sidebar: HUD & Live Leaderboard */}
+        {/* Tactical Control Sidebar: HUD, Live Leaderboard & Live Battlefield Telemetry */}
         <aside className="w-full lg:w-80 shrink-0 flex flex-col gap-4" aria-label="Tactical Status and Leaderboard">
           <TacticalHUD
             player={player}
@@ -156,12 +164,26 @@ export function GamePage({ player, battle, onReturnToLobby, onSwitchPlayer }: Ga
             onSwitchPlayer={onSwitchPlayer}
           />
 
-          <div className="flex-1">
+          <div className="shrink-0">
             <Leaderboard
               entries={leaderboard}
               currentUserId={player.id}
               onHoverPlayer={setHoveredPlayerId}
             />
+          </div>
+
+          <CommsPanel
+            messages={chatMessages}
+            reaction={reactionAnimation}
+            currentPlayerId={player.id}
+            disabled={!currentSession || currentSession.practice || currentSession.status !== 'ACTIVE'}
+            onSendMessage={sendChatMessage}
+            onSendReaction={sendReaction}
+          />
+
+          {/* Dedicated Live Battlefield Telemetry Panel (non-overlapping with grid) */}
+          <div className="p-3 rounded-2xl bg-surface/50 border border-grid-line/60 backdrop-blur-sm shadow-lg pointer-events-none select-none">
+            <ActivityFeed items={activityFeed} />
           </div>
         </aside>
       </main>

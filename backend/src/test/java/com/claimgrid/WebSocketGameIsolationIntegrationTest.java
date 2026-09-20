@@ -110,8 +110,7 @@ class WebSocketGameIsolationIntegrationTest extends BaseIntegrationTest {
         handlerB1.clear();
 
         // Perform claim in Game A
-        List<Cell> cellsA = cellRepository.findBySessionIdOrderByYAscXAsc(gameA.getGameId());
-        Cell targetCellA = cellsA.get(0);
+        Cell targetCellA = cellRepository.findBySessionIdAndXAndY(gameA.getGameId(), 8, 7).orElseThrow();
 
         ClaimCellRequest request = new ClaimCellRequest(playerA1.getId());
         restTemplate.postForEntity(
@@ -150,7 +149,6 @@ class WebSocketGameIsolationIntegrationTest extends BaseIntegrationTest {
             } catch (Exception ignored) {
             }
         }
-
         void clear() {
             history.clear();
             queue.clear();

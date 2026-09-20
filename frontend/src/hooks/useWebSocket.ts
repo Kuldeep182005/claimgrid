@@ -140,9 +140,16 @@ export function useWebSocket({ playerId, gameId, onEvent, onReconnect }: UseWebS
     }
   }, []);
 
+  const send = useCallback((payload: object) => {
+    if (wsRef.current?.readyState !== WebSocket.OPEN) return false;
+    wsRef.current.send(JSON.stringify(payload));
+    return true;
+  }, []);
+
   return {
     connectionState,
     latencyMs,
     sendPing,
+    send,
   };
 }

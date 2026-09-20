@@ -5,14 +5,18 @@ interface ActivityFeedProps {
 }
 
 export function ActivityFeed({ items }: ActivityFeedProps) {
-  if (items.length === 0) return null;
-
   return (
-    <div className="space-y-1.5 pointer-events-none">
-      <div className="text-[10px] font-mono uppercase tracking-widest text-text-muted px-1">
-        LIVE BATTLEFIELD TELEMETRY
+    <div className="space-y-1.5 pointer-events-none select-none">
+      <div className="text-[10px] font-mono uppercase tracking-widest text-text-muted px-1 flex items-center justify-between">
+        <span>LIVE BATTLEFIELD TELEMETRY</span>
+        <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
       </div>
-      <div className="space-y-1">
+      {items.length === 0 ? (
+        <div className="px-3 py-2 rounded-lg bg-surface/40 border border-grid-line/40 text-[11px] font-mono text-text-muted/60 text-center">
+          Awaiting telemetry signals...
+        </div>
+      ) : (
+        <div className="space-y-1">
         {items.map((item) => (
           <div
             key={item.id}
@@ -59,7 +63,8 @@ export function ActivityFeed({ items }: ActivityFeedProps) {
             </span>
           </div>
         ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

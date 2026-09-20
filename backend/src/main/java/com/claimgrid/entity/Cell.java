@@ -1,7 +1,10 @@
 package com.claimgrid.entity;
 
+import com.claimgrid.entity.CellType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -42,6 +45,15 @@ public class Cell {
 
     @Column(name = "claimed_at")
     private Instant claimedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cell_type", nullable = false, length = 32)
+    @Builder.Default
+    private CellType cellType = CellType.PLAIN;
+
+    @Column(name = "cell_value", nullable = false)
+    @Builder.Default
+    private int cellValue = 1;
 
     public boolean isClaimed() {
         return ownerId != null;

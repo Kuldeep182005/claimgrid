@@ -1,5 +1,6 @@
-package com.claimgrid.websocket.event;
+package com.claimgrid.dto;
 
+import com.claimgrid.entity.GameStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -12,18 +13,19 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class GameStartedEvent {
-
-    @Builder.Default
-    private String type = "GAME_STARTED";
+public class SessionResultResponse {
     private UUID gameId;
-    private String code;
     private int maxPlayers;
     private UUID player1Id;
     private UUID player2Id;
     private UUID player3Id;
     private UUID player4Id;
-    private List<UUID> playerIds;
-    private UUID currentPlayerId;
-    private int turnNumber;
+    private UUID winnerId;
+    private GameStatus status;
+    private int turnLimit;
+    private int player1Score;
+    private int player2Score;
+    private int player3Score;
+    private int player4Score;
+    private List<PlayerSummaryDto> players;
 }

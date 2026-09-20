@@ -19,4 +19,5 @@ public class PlayerJoinedEvent {
     private UUID playerId;
     private String playerName;
     private String color;
+    private int onlineCount;
 }

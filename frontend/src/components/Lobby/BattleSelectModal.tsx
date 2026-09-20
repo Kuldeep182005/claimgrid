@@ -14,6 +14,8 @@ interface BattleSelectModalProps {
 
 export function BattleSelectModal({ isOpen, player, onClose, onEnterBattle }: BattleSelectModalProps) {
   const [view, setView] = useState<'SELECT' | 'CREATE' | 'JOIN'>('SELECT');
+  const [selectedPlayers, setSelectedPlayers] = useState<2 | 4>(2);
+  const [joinedPlayersCount, setJoinedPlayersCount] = useState<number>(1);
   const [createdSession, setCreatedSession] = useState<GameSession | null>(null);
   const [joinCode, setJoinCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,6 +31,7 @@ export function BattleSelectModal({ isOpen, player, onClose, onEnterBattle }: Ba
     }
     setView('SELECT');
     setCreatedSession(null);
+    setJoinedPlayersCount(1);
     setJoinCode('');
     setError(null);
     setCopied(false);
@@ -62,12 +65,13 @@ export function BattleSelectModal({ isOpen, player, onClose, onEnterBattle }: Ba
     try {
       setLoading(true);
       setError(null);
-      const session = await api.createGame(player.id);
+      const session = await api.createGame(player.id, selectedPlayers);
       setCreatedSession(session);
+      setJoinedPlayersCount(1);
       setView('CREATE');
       sound.playClaimSuccess();
 
-      // Connect WebSocket to wait for opponent
+      // Connect WebSocket to wait for all players
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.host;
       const wsUrl = `${protocol}//${host}/ws/game?playerId=${player.id}&gameId=${session.gameId}`;
@@ -77,7 +81,14 @@ export function BattleSelectModal({ isOpen, player, onClose, onEnterBattle }: Ba
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data) as ServerGameEvent;
-          if (data.type === 'GAME_STARTED') {
+          if (data.type === 'PLAYER_JOINED') {
+            setJoinedPlayersCount((prev) => Math.min(selectedPlayers, prev + 1));
+            sound.playClaimSuccess();
+          } else if (data.type === 'GAME_STARTED') {
+            if (wsRef.current) {
+              wsRef.current.close();
+              wsRef.current = null;
+            }
             sound.playClaimSuccess();
             onEnterBattle({
               ...session,
@@ -152,7 +163,11 @@ export function BattleSelectModal({ isOpen, player, onClose, onEnterBattle }: Ba
             </div>
             <div>
               <h2 id="battle-modal-title" className="text-lg font-black tracking-wide text-text-primary uppercase">
-                {view === 'CREATE' ? 'BATTLE READY' : view === 'JOIN' ? 'JOIN BATTLE' : '2-PLAYER BATTLE'}
+                {view === 'CREATE'
+                  ? (selectedPlayers === 4 ? '4-PLAYER BATTLE' : '2-PLAYER BATTLE')
+                  : view === 'JOIN'
+                  ? 'JOIN BATTLE'
+                  : 'MULTIPLAYER BATTLE'}
               </h2>
               <span className="text-xs font-mono text-accent">
                 25 × 25 GRID • TURN-BASED COMBAT
@@ -185,8 +200,41 @@ export function BattleSelectModal({ isOpen, player, onClose, onEnterBattle }: Ba
         {view === 'SELECT' && (
           <div className="space-y-4">
             <p className="text-xs font-mono text-text-secondary">
-              Deploy to a private 2-player sector. Create a room and share the code, or join an existing battle code.
+              Deploy to a private tactical sector. Choose match capacity, create a room and share the code, or join an existing battle code.
             </p>
+
+            {/* Player Count Selector (Part 6) */}
+            <div className="space-y-2">
+              <label className="block text-xs font-mono font-bold text-text-muted uppercase tracking-wider">
+                PLAYERS
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  id="select-2-players"
+                  onClick={() => setSelectedPlayers(2)}
+                  className={`py-2.5 px-4 rounded-xl font-bold font-mono text-sm tracking-wider uppercase transition-all duration-150 cursor-pointer flex items-center justify-center gap-2 border ${
+                    selectedPlayers === 2
+                      ? 'bg-accent/20 border-accent text-accent shadow-[0_0_12px_rgba(99,102,241,0.3)] ring-1 ring-accent'
+                      : 'bg-surface-elevated/60 border-grid-line text-text-muted hover:text-text-primary hover:border-grid-line/80'
+                  }`}
+                >
+                  <span>2 PLAYERS</span>
+                </button>
+                <button
+                  type="button"
+                  id="select-4-players"
+                  onClick={() => setSelectedPlayers(4)}
+                  className={`py-2.5 px-4 rounded-xl font-bold font-mono text-sm tracking-wider uppercase transition-all duration-150 cursor-pointer flex items-center justify-center gap-2 border ${
+                    selectedPlayers === 4
+                      ? 'bg-accent/20 border-accent text-accent shadow-[0_0_12px_rgba(99,102,241,0.3)] ring-1 ring-accent'
+                      : 'bg-surface-elevated/60 border-grid-line text-text-muted hover:text-text-primary hover:border-grid-line/80'
+                  }`}
+                >
+                  <span>4 PLAYERS</span>
+                </button>
+              </div>
+            </div>
 
             <button
               type="button"
@@ -198,7 +246,7 @@ export function BattleSelectModal({ isOpen, player, onClose, onEnterBattle }: Ba
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                <span>CREATE BATTLE</span>
+                <span>CREATE {selectedPlayers}-PLAYER BATTLE</span>
               </div>
               <span className="text-xs font-mono opacity-80">Host 25×25</span>
             </button>
@@ -260,10 +308,14 @@ export function BattleSelectModal({ isOpen, player, onClose, onEnterBattle }: Ba
                 <div className="w-4 h-4 rounded-full bg-accent animate-pulse" />
               </div>
               <p className="font-bold text-text-primary uppercase tracking-wider">
-                WAITING FOR OPPONENT TO JOIN...
+                {selectedPlayers === 4
+                  ? `WAITING FOR PLAYERS (${joinedPlayersCount}/4)...`
+                  : 'WAITING FOR OPPONENT TO JOIN...'}
               </p>
               <p className="text-text-muted text-[11px]">
-                Both commanders will deploy to the battlefield automatically.
+                {selectedPlayers === 4
+                  ? 'All 4 commanders will deploy to the battlefield automatically once joined.'
+                  : 'Both commanders will deploy to the battlefield automatically.'}
               </p>
             </div>
 

@@ -6,10 +6,13 @@ import com.claimgrid.dto.CreateGameRequest;
 import com.claimgrid.dto.GameSessionResponse;
 import com.claimgrid.dto.JoinGameRequest;
 import com.claimgrid.dto.SessionGameStateResponse;
+import com.claimgrid.dto.SessionResultResponse;
 import com.claimgrid.service.BattleSessionService;
 import com.claimgrid.service.ClaimService;
+import com.claimgrid.service.PracticeBotService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -24,15 +27,29 @@ public class BattleController {
 
     private final BattleSessionService battleSessionService;
     private final ClaimService claimService;
+    private final PracticeBotService practiceBotService;
 
-    public BattleController(BattleSessionService battleSessionService, ClaimService claimService) {
+    public BattleController(BattleSessionService battleSessionService,
+                            ClaimService claimService,
+                            PracticeBotService practiceBotService) {
         this.battleSessionService = battleSessionService;
         this.claimService = claimService;
+        this.practiceBotService = practiceBotService;
+    }
+
+    @PostMapping("/practice")
+    public GameSessionResponse createPracticeGame(@Valid @RequestBody CreateGameRequest request) {
+        return practiceBotService.createPracticeGame(request.getPlayerId());
+    }
+
+    @DeleteMapping("/practice/{gameId}")
+    public void endPracticeGame(@PathVariable UUID gameId, @Valid @RequestBody CreateGameRequest request) {
+        practiceBotService.endPracticeGame(gameId, request.getPlayerId());
     }
 
     @PostMapping
     public GameSessionResponse createGame(@Valid @RequestBody CreateGameRequest request) {
-        return battleSessionService.createGame(request.getPlayerId());
+        return battleSessionService.createGame(request.getPlayerId(), request.getMaxPlayers());
     }
 
     @PostMapping("/{code}/join")
@@ -50,5 +67,17 @@ public class BattleController {
                                        @PathVariable Long cellId,
                                        @Valid @RequestBody ClaimCellRequest request) {
         return claimService.claimCell(gameId, request.getPlayerId(), cellId, request.getTurnNumber());
+    }
+
+    @PostMapping("/{gameId}/cells/{cellId}/attack")
+    public ClaimCellResponse attackCell(@PathVariable UUID gameId,
+                                       @PathVariable Long cellId,
+                                       @Valid @RequestBody ClaimCellRequest request) {
+        return claimService.attackCell(gameId, request.getPlayerId(), cellId, request.getTurnNumber());
+    }
+
+    @GetMapping("/{gameId}/result")
+    public SessionResultResponse getSessionResult(@PathVariable UUID gameId) {
+        return battleSessionService.getSessionResult(gameId);
     }
 }

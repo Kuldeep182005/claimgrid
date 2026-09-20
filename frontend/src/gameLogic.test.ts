@@ -78,30 +78,54 @@ describe('ClaimGrid Phase 5 & 6 — Frontend Logic & Interaction System', () => 
 
   it('3. PLAYER_JOINED and PLAYER_LEFT correctly update active telemetry', () => {
     let onlineCount = 1;
+    const onlinePlayerIds = new Set<string>(['p-self']);
     const playersMap = new Map<string, { username: string; color: string }>();
 
-    // Join
+    // Case A: Receiving own PLAYER_JOINED does not double-count (1 -> 1)
+    const selfJoinEvent: PlayerJoinedEvent = {
+      type: 'PLAYER_JOINED',
+      playerId: 'p-self',
+      playerName: 'Commander',
+      color: '#6366F1',
+      onlineCount: 1,
+    };
+    onlinePlayerIds.add(selfJoinEvent.playerId);
+    onlineCount = selfJoinEvent.onlineCount ?? onlinePlayerIds.size;
+    assert.equal(onlineCount, 1);
+    assert.equal(onlinePlayerIds.size, 1);
+
+    // Case B: Rival joins battle (1 -> 2)
     const joinEvent: PlayerJoinedEvent = {
       type: 'PLAYER_JOINED',
       playerId: 'p-new',
       playerName: 'Spectre',
       color: '#EC4899',
+      onlineCount: 2,
     };
-    onlineCount += 1;
+    onlinePlayerIds.add(joinEvent.playerId);
+    onlineCount = joinEvent.onlineCount ?? onlinePlayerIds.size;
     playersMap.set(joinEvent.playerId, { username: joinEvent.playerName, color: joinEvent.color });
 
     assert.equal(onlineCount, 2);
+    assert.equal(onlinePlayerIds.size, 2);
     assert.equal(playersMap.get('p-new')?.username, 'Spectre');
 
-    // Leave
+    // Case C: Duplicate tab for same player does not increase unique count
+    onlinePlayerIds.add('p-new');
+    assert.equal(onlinePlayerIds.size, 2);
+
+    // Case D: Rival leaves (2 -> 1)
     const leaveEvent: PlayerLeftEvent = {
       type: 'PLAYER_LEFT',
       playerId: 'p-new',
+      onlineCount: 1,
     };
     assert.equal(leaveEvent.type, 'PLAYER_LEFT');
     assert.equal(leaveEvent.playerId, 'p-new');
-    onlineCount = Math.max(1, onlineCount - 1);
+    onlinePlayerIds.delete(leaveEvent.playerId);
+    onlineCount = leaveEvent.onlineCount ?? Math.max(1, onlinePlayerIds.size);
     assert.equal(onlineCount, 1);
+    assert.equal(onlinePlayerIds.size, 1);
   });
 
   it('4. Cooldown progress calculation correctly models 0.0 to 1.0 progression', () => {
@@ -307,5 +331,77 @@ describe('ClaimGrid Phase 5 & 6 — Frontend Logic & Interaction System', () => 
     assert.equal(isValidCode('X7K92P'), true);
     assert.equal(isValidCode('ABCD'), false, 'Too short');
     assert.equal(isValidCode('X7K92P123'), false, 'Too long');
+  });
+
+  /* ==================================================
+   * PHASE 8: 2/4-PLAYER MULTIPLAYER SYSTEM TESTS
+   * ================================================== */
+
+  it('15. 4-Player lobby capacity validation allows strictly 2 or 4 players', () => {
+    const isValidPlayerCount = (count: number) => count === 2 || count === 4;
+
+    assert.equal(isValidPlayerCount(2), true, '2 players must be accepted');
+    assert.equal(isValidPlayerCount(4), true, '4 players must be accepted');
+    assert.equal(isValidPlayerCount(1), false, '1 player must be rejected');
+    assert.equal(isValidPlayerCount(3), false, '3 players must be rejected');
+    assert.equal(isValidPlayerCount(5), false, '5 players must be rejected');
+    assert.equal(isValidPlayerCount(6), false, '6 players must be rejected');
+  });
+
+  it('16. 4-Player turn rotation follows strict authoritative cycle A -> B -> C -> D -> A', () => {
+    const players = ['player-A', 'player-B', 'player-C', 'player-D'];
+    let currentIndex = 0;
+
+    const nextTurn = () => {
+      currentIndex = (currentIndex + 1) % players.length;
+      return players[currentIndex];
+    };
+
+    assert.equal(players[currentIndex], 'player-A', 'Starts on Player A');
+    assert.equal(nextTurn(), 'player-B', 'Advances to Player B');
+    assert.equal(nextTurn(), 'player-C', 'Advances to Player C');
+    assert.equal(nextTurn(), 'player-D', 'Advances to Player D');
+    assert.equal(nextTurn(), 'player-A', 'Wraps back to Player A');
+    assert.equal(nextTurn(), 'player-B', 'Cycles continuously to Player B');
+  });
+
+  it('17. 4-Player match start requires all 4 players and rejects 5th player', () => {
+    const maxPlayers = 4;
+    const joinedPlayers: string[] = [];
+
+    const join = (playerId: string) => {
+      if (joinedPlayers.includes(playerId)) return { status: 'DUPLICATE' };
+      if (joinedPlayers.length >= maxPlayers) return { status: 'FULL' };
+      joinedPlayers.push(playerId);
+      const matchStarted = joinedPlayers.length === maxPlayers;
+      return { status: 'JOINED', matchStarted };
+    };
+
+    assert.deepEqual(join('p1'), { status: 'JOINED', matchStarted: false });
+    assert.deepEqual(join('p2'), { status: 'JOINED', matchStarted: false });
+    assert.deepEqual(join('p2'), { status: 'DUPLICATE' });
+    assert.deepEqual(join('p3'), { status: 'JOINED', matchStarted: false });
+    assert.deepEqual(join('p4'), { status: 'JOINED', matchStarted: true });
+    assert.deepEqual(join('p5'), { status: 'FULL' });
+  });
+
+  it('18. 4-Player final standings rank all 4 players by score descending with medals', () => {
+    const players = [
+      { id: 'p1', username: 'Nova', color: '#6366F1', cellsClaimed: 8, score: 24 },
+      { id: 'p2', username: 'Luna', color: '#10B981', cellsClaimed: 12, score: 42 },
+      { id: 'p3', username: 'Rex', color: '#F59E0B', cellsClaimed: 10, score: 31 },
+      { id: 'p4', username: 'Kai', color: '#EC4899', cellsClaimed: 6, score: 18 },
+    ];
+
+    const ranked = [...players].sort((a, b) => b.score - a.score);
+
+    assert.equal(ranked[0].username, 'Luna', '1st place must be highest score');
+    assert.equal(ranked[0].score, 42);
+    assert.equal(ranked[1].username, 'Rex', '2nd place');
+    assert.equal(ranked[1].score, 31);
+    assert.equal(ranked[2].username, 'Nova', '3rd place');
+    assert.equal(ranked[2].score, 24);
+    assert.equal(ranked[3].username, 'Kai', '4th place');
+    assert.equal(ranked[3].score, 18);
   });
 });

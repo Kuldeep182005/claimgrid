@@ -17,4 +17,8 @@ public class GameFinishedEvent {
     private String type = "GAME_FINISHED";
     private UUID gameId;
     private UUID winnerId;
+    private int player1Score;
+    private int player2Score;
+    private int player3Score;
+    private int player4Score;
 }

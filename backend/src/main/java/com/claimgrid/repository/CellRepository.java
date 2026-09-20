@@ -22,6 +22,10 @@ public interface CellRepository extends JpaRepository<Cell, Long> {
 
     List<Cell> findBySessionIdOrderByYAscXAsc(UUID sessionId);
 
+    List<Cell> findBySessionIdAndOwnerIdOrderByYAscXAsc(UUID sessionId, UUID ownerId);
+
+    Optional<Cell> findFirstBySessionIdAndOwnerIdIsNullOrderByIdAsc(UUID sessionId);
+
     @Query("SELECT c FROM Cell c WHERE c.sessionId IS NULL ORDER BY c.y ASC, c.x ASC")
     List<Cell> findAllGlobalCellsOrderByYAscXAsc();
 
@@ -55,6 +59,13 @@ public interface CellRepository extends JpaRepository<Cell, Long> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE Cell c SET c.ownerId = :playerId, c.claimedAt = CURRENT_TIMESTAMP WHERE c.id = :cellId AND c.sessionId = :sessionId AND c.ownerId IS NULL")
     int claimCellAtomically(@Param("cellId") Long cellId, @Param("sessionId") UUID sessionId, @Param("playerId") UUID playerId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Cell c SET c.ownerId = :playerId, c.claimedAt = CURRENT_TIMESTAMP WHERE c.id = :cellId AND c.sessionId = :sessionId AND c.ownerId = :enemyPlayerId")
+    int captureAdjacentEnemyCell(@Param("cellId") Long cellId,
+                                @Param("sessionId") UUID sessionId,
+                                @Param("playerId") UUID playerId,
+                                @Param("enemyPlayerId") UUID enemyPlayerId);
 
     /**
      * Atomically claims a cell in global mode if and only if it is currently unowned.

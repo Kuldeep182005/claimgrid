@@ -6,6 +6,7 @@ export interface Player {
   lastSeenAt: string;
   lastClaimAt?: string | null;
   cellsClaimed: number;
+  score?: number;
   currentStreak: number;
 }
 
@@ -14,6 +15,7 @@ export interface LeaderboardEntry {
   username: string;
   color: string;
   cellsClaimed: number;
+  score?: number;
   currentStreak: number;
   rank: number;
 }

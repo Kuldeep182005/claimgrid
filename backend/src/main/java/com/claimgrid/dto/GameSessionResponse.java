@@ -18,12 +18,19 @@ public class GameSessionResponse {
     private UUID gameId;
     private String code;
     private GameStatus status;
+    private int maxPlayers;
     private int playerCount;
     private UUID currentPlayerId;
     private int turnNumber;
     private UUID winnerId;
+    private int turnLimit;
+    private int player1Score;
+    private int player2Score;
+    private int player3Score;
+    private int player4Score;
     private Instant createdAt;
     private Instant startedAt;
     private Instant finishedAt;
+    private boolean practice;
     private List<PlayerSummaryDto> players;
 }

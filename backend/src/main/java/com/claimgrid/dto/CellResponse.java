@@ -20,6 +20,8 @@ public class CellResponse {
     private int y;
     private UUID ownerId;
     private Instant claimedAt;
+    private String cellType;
+    private int cellValue;
 
     public static CellResponse fromEntity(Cell cell) {
         return CellResponse.builder()
@@ -28,6 +30,8 @@ public class CellResponse {
                 .y(cell.getY())
                 .ownerId(cell.getOwnerId())
                 .claimedAt(cell.getClaimedAt())
+                .cellType(cell.getCellType() == null ? null : cell.getCellType().name())
+                .cellValue(cell.getCellValue())
                 .build();
     }
 }

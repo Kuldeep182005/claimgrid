@@ -8,7 +8,11 @@ export type ClaimStatus =
   | 'GAME_NOT_ACTIVE'
   | 'NOT_IN_GAME'
   | 'GAME_FINISHED'
-  | 'INVALID_REQUEST';
+  | 'INVALID_REQUEST'
+  | 'FRONTIER_INVALID'
+  | 'ATTACK_REJECTED'
+  | 'ATTACK_SUCCESS';
+  // Gameplay redesign statuses are returned by battle actions.
 
 export type GameStatus = 'WAITING' | 'ACTIVE' | 'FINISHED';
 
@@ -17,12 +21,14 @@ export interface PlayerSummary {
   username: string;
   color: string;
   cellsClaimed: number;
+  score?: number;
 }
 
 export interface GameSession {
   gameId: string;
   code: string;
   status: GameStatus;
+  maxPlayers?: number;
   playerCount: number;
   currentPlayerId: string | null;
   turnNumber: number;
@@ -31,6 +37,12 @@ export interface GameSession {
   startedAt?: string | null;
   finishedAt?: string | null;
   players: PlayerSummary[];
+  practice?: boolean;
+  turnLimit?: number;
+  player1Score?: number;
+  player2Score?: number;
+  player3Score?: number;
+  player4Score?: number;
 }
 
 export interface Cell {
@@ -39,6 +51,8 @@ export interface Cell {
   y: number;
   ownerId: string | null;
   claimedAt: string | null;
+  cellType?: string | null;
+  cellValue?: number;
 }
 
 export interface GameState {
@@ -47,12 +61,14 @@ export interface GameState {
   totalCells: number;
   claimedCells: number;
   cells: Cell[];
+  onlineCount?: number;
 }
 
 export interface SessionGameState {
   gameId: string;
   code: string;
   status: GameStatus;
+  maxPlayers?: number;
   width: number;
   height: number;
   totalCells: number;
@@ -64,6 +80,13 @@ export interface SessionGameState {
   finishedAt?: string | null;
   players: PlayerSummary[];
   cells: Cell[];
+  onlineCount?: number;
+  practice?: boolean;
+  turnLimit?: number;
+  player1Score?: number;
+  player2Score?: number;
+  player3Score?: number;
+  player4Score?: number;
 }
 
 export interface ClaimCellRequest {

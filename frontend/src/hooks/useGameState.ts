@@ -5,7 +5,7 @@ import { useCooldown } from './useCooldown';
 import { useWebSocket } from './useWebSocket';
 import type { Cell, GameSession } from '../types/game';
 import type { LeaderboardEntry, Player } from '../types/player';
-import type { ServerGameEvent } from '../types/websocket';
+import type { ReactionType, ServerGameEvent } from '../types/websocket';
 
 export interface ActivityItem {
   id: string;
@@ -13,6 +13,21 @@ export interface ActivityItem {
   message: string;
   timestamp: number;
   color?: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  playerId: string;
+  playerName: string;
+  message: string;
+  timestamp: string;
+}
+
+export interface ReactionAnimation {
+  id: string;
+  playerId: string;
+  playerName: string;
+  reaction: ReactionType;
 }
 
 export function useGameState(initialPlayer: Player | null, activeGameId?: string | null) {
@@ -28,6 +43,8 @@ export function useGameState(initialPlayer: Player | null, activeGameId?: string
   const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([]);
   const [lastClaimAnimation, setLastClaimAnimation] = useState<{ cellId: number; isSelf: boolean; timestamp: number } | null>(null);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'warning' | 'error' } | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [reactionAnimation, setReactionAnimation] = useState<ReactionAnimation | null>(null);
 
   const cooldown = useCooldown();
   const { isCooldownActive, getRemainingSeconds, startCooldown } = cooldown;
@@ -35,9 +52,13 @@ export function useGameState(initialPlayer: Player | null, activeGameId?: string
   const playerRef = useRef<Player | null>(player);
   const battleSessionRef = useRef<GameSession | null>(battleSession);
   const snapshotRequestIdRef = useRef<number>(0);
+  const onlinePlayerIdsRef = useRef<Set<string>>(new Set(player?.id ? [player.id] : []));
 
   useEffect(() => {
     playerRef.current = player;
+    if (player?.id) {
+      onlinePlayerIdsRef.current.add(player.id);
+    }
   }, [player]);
 
   useEffect(() => {
@@ -77,13 +98,20 @@ export function useGameState(initialPlayer: Player | null, activeGameId?: string
           gameId: battleState.gameId,
           code: battleState.code,
           status: battleState.status,
+          maxPlayers: battleState.maxPlayers ?? 2,
           playerCount: battleState.players.length,
           currentPlayerId: battleState.currentPlayerId,
           turnNumber: battleState.turnNumber,
+          turnLimit: battleState.turnLimit,
+          player1Score: battleState.player1Score,
+          player2Score: battleState.player2Score,
+          player3Score: battleState.player3Score,
+          player4Score: battleState.player4Score,
           winnerId: battleState.winnerId,
           startedAt: battleState.startedAt,
           finishedAt: battleState.finishedAt,
           players: battleState.players,
+          practice: battleState.practice,
         };
         setBattleSession(sessionData);
 
@@ -119,6 +147,10 @@ export function useGameState(initialPlayer: Player | null, activeGameId?: string
           battleState.players.forEach((p) => next.set(p.id, { username: p.username, color: p.color }));
           return next;
         });
+
+        if (battleState.onlineCount !== undefined) {
+          setOnlineCount(battleState.onlineCount);
+        }
       } else {
         // Fallback global mode
         const [gameState, lb] = await Promise.all([
@@ -149,6 +181,10 @@ export function useGameState(initialPlayer: Player | null, activeGameId?: string
         });
 
         setLeaderboard(lb.entries);
+
+        if (gameState.onlineCount !== undefined) {
+          setOnlineCount(gameState.onlineCount);
+        }
         setPlayersMap((prev) => {
           const next = new Map(prev);
           lb.entries.forEach((entry) => next.set(entry.id, { username: entry.username, color: entry.color }));
@@ -256,12 +292,14 @@ export function useGameState(initialPlayer: Player | null, activeGameId?: string
                 status: 'ACTIVE',
                 currentPlayerId: event.currentPlayerId,
                 turnNumber: event.turnNumber,
+                maxPlayers: event.maxPlayers ?? prev.maxPlayers,
               }
             : null
         );
-        addActivity('JOIN', `Opponent joined! Battle commenced — Turn 1`);
+        addActivity('JOIN', `All commanders deployed! Battle commenced — Turn 1`);
         sound.playClaimSuccess();
         showStatus('⚔ BATTLE COMMENCED! All systems online', 'success');
+        loadSnapshot();
         break;
       }
 
@@ -272,9 +310,14 @@ export function useGameState(initialPlayer: Player | null, activeGameId?: string
                 ...prev,
                 status: 'FINISHED',
                 winnerId: event.winnerId,
+                player1Score: event.player1Score,
+                player2Score: event.player2Score,
+                player3Score: event.player3Score,
+                player4Score: event.player4Score,
               }
             : null
         );
+        loadSnapshot();
         const currentPlayer = playerRef.current;
         if (currentPlayer) {
           if (event.winnerId === currentPlayer.id) {
@@ -289,6 +332,16 @@ export function useGameState(initialPlayer: Player | null, activeGameId?: string
       }
 
       case 'LEADERBOARD_UPDATED': {
+        setBattleSession((prev) => {
+          if (!prev || !prev.players) return prev;
+          const updatedPlayers = prev.players.map((p) =>
+            p.id === event.playerId
+              ? { ...p, cellsClaimed: event.cellsClaimed, score: event.score ?? p.score }
+              : p
+          );
+          return { ...prev, players: updatedPlayers };
+        });
+
         setLeaderboard((prevLb) => {
           const existingIndex = prevLb.findIndex((e) => e.id === event.playerId);
           let updated: LeaderboardEntry[];
@@ -297,6 +350,7 @@ export function useGameState(initialPlayer: Player | null, activeGameId?: string
             updated[existingIndex] = {
               ...updated[existingIndex],
               cellsClaimed: event.cellsClaimed,
+              score: event.score,
             };
           } else {
             const playerInfo = playersMap.get(event.playerId);
@@ -308,6 +362,7 @@ export function useGameState(initialPlayer: Player | null, activeGameId?: string
                   username: playerInfo.username,
                   color: playerInfo.color,
                   cellsClaimed: event.cellsClaimed,
+                  score: event.score,
                   currentStreak: 0,
                   rank: prevLb.length + 1,
                 },
@@ -317,19 +372,27 @@ export function useGameState(initialPlayer: Player | null, activeGameId?: string
             }
           }
           return updated
-            .sort((a, b) => b.cellsClaimed - a.cellsClaimed)
+            .sort((a, b) => (b.score ?? b.cellsClaimed) - (a.score ?? a.cellsClaimed))
             .map((entry, idx) => ({ ...entry, rank: idx + 1 }));
         });
         break;
       }
 
       case 'PLAYER_JOINED': {
-        setOnlineCount((c) => c + 1);
+        onlinePlayerIdsRef.current.add(event.playerId);
+        if (event.onlineCount !== undefined) {
+          setOnlineCount(event.onlineCount);
+        } else {
+          setOnlineCount(onlinePlayerIdsRef.current.size);
+        }
         setPlayersMap((prev) => {
           const next = new Map(prev);
           next.set(event.playerId, { username: event.playerName, color: event.color });
           return next;
         });
+        if (activeGameId) {
+          loadSnapshot();
+        }
         const currentPlayer = playerRef.current;
         if (currentPlayer && event.playerId !== currentPlayer.id) {
           addActivity('JOIN', `${event.playerName} connected to battle`, event.color);
@@ -338,7 +401,12 @@ export function useGameState(initialPlayer: Player | null, activeGameId?: string
       }
 
       case 'PLAYER_LEFT': {
-        setOnlineCount((c) => Math.max(1, c - 1));
+        onlinePlayerIdsRef.current.delete(event.playerId);
+        if (event.onlineCount !== undefined) {
+          setOnlineCount(event.onlineCount);
+        } else {
+          setOnlineCount(Math.max(1, onlinePlayerIdsRef.current.size));
+        }
         const leftPlayer = playersMap.get(event.playerId);
         if (leftPlayer) {
           addActivity('LEAVE', `${leftPlayer.username} disconnected`);
@@ -346,16 +414,60 @@ export function useGameState(initialPlayer: Player | null, activeGameId?: string
         }
         break;
       }
+
+      case 'CHAT_MESSAGE': {
+        setChatMessages((previous) => [
+          ...previous,
+          {
+            id: `${event.timestamp}-${event.playerId}-${Math.random()}`,
+            playerId: event.playerId,
+            playerName: event.playerName,
+            message: event.message,
+            timestamp: event.timestamp,
+          },
+        ].slice(-30));
+        break;
+      }
+
+      case 'PLAYER_REACTION': {
+        const animation = {
+          id: `${event.timestamp}-${event.playerId}-${Math.random()}`,
+          playerId: event.playerId,
+          playerName: event.playerName,
+          reaction: event.reaction,
+        };
+        setReactionAnimation(animation);
+        window.setTimeout(() => {
+          setReactionAnimation((current) => current?.id === animation.id ? null : current);
+        }, 1400);
+        break;
+      }
+
+      case 'COMMS_ERROR':
+        showStatus(event.message, 'warning');
+        break;
     }
-  }, [playersMap, addActivity, showStatus]);
+  }, [playersMap, addActivity, showStatus, loadSnapshot, activeGameId]);
 
   // Connect WebSocket hook with auto-reconnect and snapshot resync
-  const { connectionState, latencyMs } = useWebSocket({
+  const { connectionState, latencyMs, send } = useWebSocket({
     playerId: player?.id,
     gameId: activeGameId ?? undefined,
     onEvent: handleWebSocketEvent,
     onReconnect: loadSnapshot,
   });
+
+  const sendChatMessage = useCallback((message: string) => {
+    if (!activeGameId || battleSessionRef.current?.practice) return false;
+    const trimmed = message.trim();
+    if (!trimmed || trimmed.length > 120) return false;
+    return send({ type: 'SEND_CHAT_MESSAGE', gameId: activeGameId, message: trimmed });
+  }, [activeGameId, send]);
+
+  const sendReaction = useCallback((reaction: ReactionType) => {
+    if (!activeGameId || battleSessionRef.current?.practice) return false;
+    return send({ type: 'SEND_REACTION', gameId: activeGameId, reaction });
+  }, [activeGameId, send]);
 
   // Initial mount: load snapshot
   useEffect(() => {
@@ -364,7 +476,7 @@ export function useGameState(initialPlayer: Player | null, activeGameId?: string
     });
   }, [loadSnapshot]);
 
-  // Player action: Claim cell
+  // Player action: expand into a frontier or attack an adjacent enemy cell.
   const claimCell = useCallback(
     async (cellId: number) => {
       const currentPlayer = playerRef.current;
@@ -399,23 +511,26 @@ export function useGameState(initialPlayer: Player | null, activeGameId?: string
       }
 
       const cell = cellsMapRef.current.get(cellId);
-      if (cell && cell.ownerId !== null) {
+      if (cell && cell.ownerId !== null && cell.ownerId === currentPlayer.id) {
         sound.playError();
-        showStatus('SECTOR ALREADY CLAIMED', 'warning');
+        showStatus('YOUR SECTOR IS ALREADY CLAIMED', 'warning');
         return;
       }
 
       try {
         setClaimingCellId(cellId);
+        const isAttack = Boolean(activeGameId && cell?.ownerId && cell.ownerId !== currentPlayer.id);
         const res = activeGameId
-          ? await api.claimBattleCell(activeGameId, cellId, currentPlayer.id, battleSessionRef.current?.turnNumber)
+          ? (isAttack
+            ? await api.attackBattleCell(activeGameId, cellId, currentPlayer.id, battleSessionRef.current?.turnNumber)
+            : await api.claimBattleCell(activeGameId, cellId, currentPlayer.id, battleSessionRef.current?.turnNumber))
           : await api.claimCell(cellId, currentPlayer.id);
 
         if (res.success) {
           startCooldown(res.remainingCooldownMs || 3000);
           sound.playClaimSuccess();
-          showStatus(`Territory secured! Sector (${res.x}, ${res.y})`, 'success');
-          addActivity('CLAIM', `Sector (${res.x}, ${res.y}) • +1 territory`, currentPlayer.color);
+          showStatus(`${isAttack ? 'Enemy sector captured' : 'Territory expanded'} at (${res.x}, ${res.y})`, 'success');
+          addActivity('CLAIM', `${isAttack ? 'Attacked' : 'Expanded'} sector (${res.x}, ${res.y})`, currentPlayer.color);
 
           if (res.cellsClaimed !== undefined) {
             setPlayer((prev) => (prev ? { ...prev, cellsClaimed: res.cellsClaimed! } : null));
@@ -442,6 +557,12 @@ export function useGameState(initialPlayer: Player | null, activeGameId?: string
           } else if (res.status === 'CELL_ALREADY_CLAIMED') {
             sound.playError();
             showStatus('SECTOR ALREADY CLAIMED', 'error');
+          } else if (res.status === 'FRONTIER_INVALID') {
+            sound.playError();
+            showStatus('NOT CONNECTED TO YOUR TERRITORY', 'warning');
+          } else if (res.status === 'ATTACK_REJECTED') {
+            sound.playError();
+            showStatus(res.message || 'ATTACK UNAVAILABLE — TARGET MUST TOUCH YOUR TERRITORY', 'warning');
           } else {
             sound.playError();
             showStatus(res.message || 'Claim rejected', 'error');
@@ -477,5 +598,9 @@ export function useGameState(initialPlayer: Player | null, activeGameId?: string
     cooldown,
     claimCell,
     reloadState: loadSnapshot,
+    chatMessages,
+    reactionAnimation,
+    sendChatMessage,
+    sendReaction,
   };
 }

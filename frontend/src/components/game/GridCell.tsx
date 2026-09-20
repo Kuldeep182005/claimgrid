@@ -6,6 +6,9 @@ interface GridCellProps {
   y: number;
   ownerId: string | null;
   ownerColor?: string;
+  cellType?: string | null;
+  cellValue?: number;
+  isFrontier?: boolean;
   isCurrentPlayer: boolean;
   isClaiming: boolean;
   isHighlighted?: boolean;
@@ -21,6 +24,9 @@ export const GridCell = React.memo(function GridCell({
   y,
   ownerId,
   ownerColor,
+  cellType,
+  cellValue,
+  isFrontier,
   isCurrentPlayer,
   isClaiming,
   isHighlighted,
@@ -30,6 +36,7 @@ export const GridCell = React.memo(function GridCell({
   onHover,
 }: GridCellProps) {
   const isClaimed = ownerId !== null;
+  const isStrategic = cellType && cellType !== 'PLAIN';
 
   const style: CSSProperties & { ['--claim-color']?: string } = {};
   if (isClaimed && ownerColor) {
@@ -64,9 +71,12 @@ export const GridCell = React.memo(function GridCell({
       onMouseEnter={() => onHover({ id, x, y, ownerId, ownerColor })}
       onMouseLeave={() => onHover(null)}
       style={style}
+      data-value={isStrategic ? (cellValue ?? 1) : undefined}
       className={`
         relative aspect-square rounded-[2px] transition-all duration-150 cursor-pointer select-none
         ${!isClaimed ? 'bg-grid-cell border border-grid-line/50 hover:bg-grid-cell-hover hover:border-accent/90 hover:scale-110 hover:shadow-[0_0_8px_rgba(99,102,241,0.5)] hover:z-10' : ''}
+        ${isFrontier ? 'ring-1 ring-success/70 shadow-[0_0_6px_rgba(16,185,129,0.35)]' : ''}
+        ${isStrategic ? 'after:content-[attr(data-value)] after:absolute after:inset-0 after:flex after:items-center after:justify-center after:text-[8px] after:font-black after:text-warning' : ''}
         ${isClaimed && isCurrentPlayer ? 'ring-1 ring-white/60 hover:brightness-110 hover:scale-105 hover:z-10' : ''}
         ${isClaimed && !isCurrentPlayer ? 'hover:brightness-110 hover:scale-105 hover:z-10' : ''}
         ${isClaiming ? 'animate-pulse ring-2 ring-accent ring-offset-1 ring-offset-surface z-25 shadow-[0_0_12px_rgba(99,102,241,0.9)]' : ''}

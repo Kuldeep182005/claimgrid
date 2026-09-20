@@ -5,17 +5,13 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.UUID;
-
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class PlayerLeftEvent {
-
+public class CommsErrorEvent {
     @Builder.Default
-    private String type = "PLAYER_LEFT";
-    private UUID gameId;
-    private UUID playerId;
-    private int onlineCount;
+    private String type = "COMMS_ERROR";
+    private String code;
+    private String message;
 }

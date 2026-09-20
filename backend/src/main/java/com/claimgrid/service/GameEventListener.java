@@ -80,8 +80,12 @@ public class GameEventListener {
         sessionManager.broadcastToGame(event.gameId(), GameStartedEvent.builder()
                 .gameId(event.gameId())
                 .code(event.code())
+                .maxPlayers(event.maxPlayers())
                 .player1Id(event.player1Id())
                 .player2Id(event.player2Id())
+                .player3Id(event.player3Id())
+                .player4Id(event.player4Id())
+                .playerIds(event.playerIds())
                 .currentPlayerId(event.currentPlayerId())
                 .turnNumber(event.turnNumber())
                 .build());
@@ -94,6 +98,10 @@ public class GameEventListener {
         sessionManager.broadcastToGame(event.gameId(), GameFinishedEvent.builder()
                 .gameId(event.gameId())
                 .winnerId(event.winnerId())
+                .player1Score(event.player1Score())
+                .player2Score(event.player2Score())
+                .player3Score(event.player3Score())
+                .player4Score(event.player4Score())
                 .build());
     }
 }

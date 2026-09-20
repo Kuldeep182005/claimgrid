@@ -30,11 +30,6 @@ export function TacticalHUD({
   if (!player) return null;
 
   const percentage = totalCells > 0 ? ((player.cellsClaimed / totalCells) * 100).toFixed(1) : '0.0';
-
-  const userStats = battleSession?.players?.find((p) => p.id === player.id);
-  const rivalStats = battleSession?.players?.find((p) => p.id !== player.id);
-  const userCells = userStats?.cellsClaimed ?? player.cellsClaimed;
-  const rivalCells = rivalStats?.cellsClaimed ?? 0;
   const activeTurnNumber = turnNumber ?? battleSession?.turnNumber;
 
   return (
@@ -73,70 +68,136 @@ export function TacticalHUD({
         </button>
       </div>
 
-      {/* Head-to-Head 2-Player Battle HUD (Part 17) */}
+      {/* Multi-Player / 2-4 Player Battle HUD */}
       {battleSession ? (
         <div className="flex flex-col gap-3">
-          {/* YOU vs RIVAL Grid */}
-          <div className="grid grid-cols-2 gap-2 bg-surface-elevated/60 border border-grid-line/50 rounded-xl p-3">
-            {/* YOU */}
-            <div className="flex flex-col">
-              <div className="flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-wider text-text-muted">
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: player.color }} />
-                <span>YOU</span>
-              </div>
-              <div className="text-2xl font-black text-text-primary mt-1">
-                {userCells}
-                <span className="text-xs font-normal text-text-secondary ml-1">CELLS</span>
-              </div>
-              <div className="text-[10px] font-mono text-text-muted truncate">
-                {player.username}
-              </div>
-            </div>
-
-            {/* RIVAL */}
-            <div className="flex flex-col text-right border-l border-grid-line/50 pl-2">
-              <div className="flex items-center justify-end gap-1.5 text-[11px] font-mono uppercase tracking-wider text-text-muted">
-                <span>RIVAL</span>
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: rivalStats?.color ?? '#6B7280' }}
-                />
-              </div>
-              <div className="text-2xl font-black text-text-primary mt-1">
-                {rivalCells}
-                <span className="text-xs font-normal text-text-secondary ml-1">CELLS</span>
-              </div>
-              <div className="text-[10px] font-mono text-text-muted truncate">
-                {rivalStats?.username ?? (battleSession.status === 'WAITING' ? 'Waiting...' : 'Opponent')}
-              </div>
-            </div>
+          {/* Battle Header & Round Status */}
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-text-muted">
+              COMMANDERS ({battleSession.players?.length ?? 1}/{battleSession.maxPlayers ?? 2})
+            </span>
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-surface-elevated border border-grid-line/50 text-text-secondary">
+              ROUND {activeTurnNumber ?? 1} / {battleSession.turnLimit ?? 40}
+            </span>
           </div>
 
-          {/* Territory Dominance Bar */}
-          <div className="space-y-1">
+          {/* Dynamic Player Roster (Supports 2 or 4 Players) */}
+          <div className="flex flex-col gap-1.5">
+            {battleSession.players?.map((p) => {
+              const isSelf = p.id === player.id;
+              const isPlayerTurn = battleSession.status === 'ACTIVE' && battleSession.currentPlayerId === p.id;
+              const score = p.score ?? p.cellsClaimed;
+
+              return (
+                <div
+                  key={p.id}
+                  className={`flex items-center justify-between p-2.5 rounded-xl border transition-all duration-150 ${
+                    isPlayerTurn
+                      ? isSelf
+                        ? 'bg-success/15 border-success/60 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
+                        : 'bg-warning/10 border-warning/50'
+                      : isSelf
+                      ? 'bg-surface-elevated/80 border-accent/40'
+                      : 'bg-surface-elevated/40 border-grid-line/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className="w-3 h-3 rounded-full shrink-0 shadow-sm ring-1 ring-white/20"
+                      style={{ backgroundColor: p.color }}
+                    />
+                    <div className="min-w-0 flex flex-col">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-xs text-text-primary truncate">
+                          {p.username}
+                        </span>
+                        {isSelf && (
+                          <span className="text-[9px] font-mono font-black uppercase px-1 py-0.2 rounded bg-accent/20 text-accent border border-accent/30">
+                            YOU
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-mono text-text-muted">
+                        {p.cellsClaimed} {p.cellsClaimed === 1 ? 'cell' : 'cells'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {isPlayerTurn && (
+                      <span
+                        className={`text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full flex items-center gap-1 ${
+                          isSelf
+                            ? 'bg-success/20 text-success border border-success/40 animate-pulse'
+                            : 'bg-warning/20 text-warning border border-warning/40'
+                        }`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${isSelf ? 'bg-success animate-ping' : 'bg-warning'}`} />
+                        {isSelf ? 'YOUR TURN' : 'ACTIVE'}
+                      </span>
+                    )}
+                    <div className="text-right">
+                      <div className="text-xs font-black font-mono text-text-primary">
+                        {score} <span className="text-[9px] font-normal text-text-muted">PTS</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Empty slots placeholders if match is waiting */}
+            {battleSession.status === 'WAITING' &&
+              Array.from({ length: Math.max(0, (battleSession.maxPlayers ?? 2) - (battleSession.players?.length ?? 0)) }).map((_, idx) => (
+                <div
+                  key={`empty-slot-${idx}`}
+                  className="flex items-center justify-between p-2 rounded-xl border border-dashed border-grid-line/60 bg-surface/20 text-text-muted text-xs font-mono"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-grid-line animate-pulse" />
+                    <span>Slot {(battleSession.players?.length ?? 0) + idx + 1}: Waiting...</span>
+                  </div>
+                  <span className="text-[10px] text-text-muted/60 uppercase">OPEN</span>
+                </div>
+              ))}
+          </div>
+
+          {/* Multi-Segment Territory Dominance Bar */}
+          <div className="space-y-1 mt-1">
             <div className="flex justify-between text-[10px] font-mono text-text-muted">
               <span>TERRITORY CONTROL</span>
               <span>{percentage}% OF 625</span>
             </div>
-            <div className="w-full h-2 rounded-full bg-surface-elevated overflow-hidden border border-grid-line/40 flex">
-              <div
-                className="h-full transition-all duration-300"
-                style={{
-                  width: `${userCells + rivalCells > 0 ? (userCells / (userCells + rivalCells)) * 100 : 50}%`,
-                  backgroundColor: player.color,
-                }}
-              />
-              <div
-                className="h-full transition-all duration-300"
-                style={{
-                  width: `${userCells + rivalCells > 0 ? (rivalCells / (userCells + rivalCells)) * 100 : 50}%`,
-                  backgroundColor: rivalStats?.color ?? '#374151',
-                }}
-              />
+            <div className="w-full h-2.5 rounded-full bg-surface-elevated overflow-hidden border border-grid-line/40 flex">
+              {(() => {
+                const totalClaimed = (battleSession.players ?? []).reduce((acc, p) => acc + p.cellsClaimed, 0);
+                if (totalClaimed === 0) {
+                  return (
+                    <div
+                      className="h-full w-full bg-grid-line/40"
+                      title="No cells claimed yet"
+                    />
+                  );
+                }
+                return (battleSession.players ?? []).map((p) => {
+                  const pct = (p.cellsClaimed / totalClaimed) * 100;
+                  return (
+                    <div
+                      key={p.id}
+                      className="h-full transition-all duration-300"
+                      style={{
+                        width: `${pct}%`,
+                        backgroundColor: p.color,
+                      }}
+                      title={`${p.username}: ${p.cellsClaimed} cells (${pct.toFixed(1)}%)`}
+                    />
+                  );
+                });
+              })()}
             </div>
           </div>
 
-          {/* Turn Status Card */}
+          {/* Prominent Turn Status Card */}
           <div
             className={`p-3 rounded-xl border font-mono text-xs flex items-center justify-between transition-all duration-200 ${
               battleSession.status === 'WAITING'
@@ -152,7 +213,7 @@ export function TacticalHUD({
               {battleSession.status === 'WAITING' ? (
                 <>
                   <span className="w-2 h-2 rounded-full bg-accent animate-ping" />
-                  <span>WAITING FOR RIVAL</span>
+                  <span>WAITING FOR PLAYERS ({battleSession.players?.length ?? 1}/{battleSession.maxPlayers ?? 2})</span>
                 </>
               ) : battleSession.status === 'FINISHED' ? (
                 <>
@@ -166,7 +227,9 @@ export function TacticalHUD({
               ) : (
                 <>
                   <span className="w-2 h-2 rounded-full bg-warning" />
-                  <span>⏳ RIVAL TURN</span>
+                  <span>
+                    ⏳ {battleSession.players?.find((p) => p.id === battleSession.currentPlayerId)?.username?.toUpperCase() ?? 'OPPONENT'}'S TURN
+                  </span>
                 </>
               )}
             </div>

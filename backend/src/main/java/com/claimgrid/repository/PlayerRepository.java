@@ -24,7 +24,7 @@ public interface PlayerRepository extends JpaRepository<Player, UUID> {
 
     List<Player> findTop10ByOrderByCellsClaimedDescCreatedAtAsc();
 
-    @Query("SELECT p FROM Player p ORDER BY p.cellsClaimed DESC, p.createdAt ASC")
+    @Query("SELECT p FROM Player p WHERE p.bot = false ORDER BY p.cellsClaimed DESC, p.createdAt ASC")
     List<Player> findLeaderboard(Pageable pageable);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
@@ -47,4 +47,8 @@ public interface PlayerRepository extends JpaRepository<Player, UUID> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE Player p SET p.cellsClaimed = p.cellsClaimed + 1, p.lastClaimAt = :now, p.lastSeenAt = :now WHERE p.id = :playerId")
     int recordSuccessfulClaim(@Param("playerId") UUID playerId, @Param("now") Instant now);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Player p SET p.lastClaimAt = :now, p.lastSeenAt = :now WHERE p.id = :playerId")
+    int recordPracticeClaim(@Param("playerId") UUID playerId, @Param("now") Instant now);
 }

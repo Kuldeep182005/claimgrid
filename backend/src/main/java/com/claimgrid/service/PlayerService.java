@@ -22,7 +22,7 @@ public class PlayerService {
     private static final Logger log = LoggerFactory.getLogger(PlayerService.class);
 
     // Curated high-contrast, modern game colors for player territory visualization
-    private static final List<String> PALETTE = List.of(
+    public static final List<String> PALETTE = List.of(
             "#EF4444", "#F97316", "#F59E0B", "#10B981",
             "#06B6D4", "#3B82F6", "#6366F1", "#8B5CF6",
             "#EC4899", "#14B8A6", "#F43F5E", "#84CC16"

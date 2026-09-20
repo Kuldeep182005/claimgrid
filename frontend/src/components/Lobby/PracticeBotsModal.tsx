@@ -4,9 +4,10 @@ interface PracticeBotsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onDeployMultiplayer: () => void;
+  onStartPractice: () => void;
 }
 
-export function PracticeBotsModal({ isOpen, onClose, onDeployMultiplayer }: PracticeBotsModalProps) {
+export function PracticeBotsModal({ isOpen, onClose, onDeployMultiplayer, onStartPractice }: PracticeBotsModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -48,7 +49,7 @@ export function PracticeBotsModal({ isOpen, onClose, onDeployMultiplayer }: Prac
                 PRACTICE VS BOTS
               </h2>
               <span className="text-xs font-mono text-accent">
-                COMING NEXT • PHASE 8 TARGET
+                RIVAL-01 • MEDIUM AI
               </span>
             </div>
           </div>
@@ -73,15 +74,15 @@ export function PracticeBotsModal({ isOpen, onClose, onDeployMultiplayer }: Prac
               GameSession Architecture Ready
             </div>
             <p className="font-sans text-xs text-text-secondary">
-              Phase 7 has successfully established the 25×25 private battle session engine with isolated WebSocket channels and turn-locking.
+              RIVAL-01 is a server-authoritative medium-difficulty commander on the current 25×25 battlefield.
             </p>
             <p className="font-sans text-xs text-text-secondary">
-              Phase 8 will introduce server-authoritative AI commanders (<span className="text-accent font-semibold">Scout, Expander, Aggressor</span>) that plug directly into this same GameSession architecture.
+              The bot uses the same turn, cooldown, atomic claim, and WebSocket event pipeline as human commanders.
             </p>
           </div>
 
           <p className="font-sans text-xs text-text-muted">
-            For now, challenge other live commanders using private battle codes!
+            Practice claims stay isolated from global multiplayer territory and presence.
           </p>
         </div>
 
@@ -93,6 +94,13 @@ export function PracticeBotsModal({ isOpen, onClose, onDeployMultiplayer }: Prac
             className="w-full sm:w-auto px-4 py-2.5 rounded-xl font-mono text-xs uppercase tracking-wider text-text-secondary hover:text-text-primary hover:bg-surface-elevated border border-grid-line/60 transition-all cursor-pointer"
           >
             Close
+          </button>
+          <button
+            type="button"
+            onClick={onStartPractice}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider bg-warning hover:bg-warning/80 text-black shadow-md active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
+          >
+            Start Practice
           </button>
           <button
             type="button"

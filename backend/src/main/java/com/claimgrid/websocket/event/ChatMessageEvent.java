@@ -5,17 +5,19 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class PlayerLeftEvent {
-
+public class ChatMessageEvent {
     @Builder.Default
-    private String type = "PLAYER_LEFT";
+    private String type = "CHAT_MESSAGE";
     private UUID gameId;
     private UUID playerId;
-    private int onlineCount;
+    private String playerName;
+    private String message;
+    private Instant timestamp;
 }

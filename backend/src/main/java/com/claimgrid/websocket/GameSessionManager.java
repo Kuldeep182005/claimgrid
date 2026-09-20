@@ -192,8 +192,44 @@ public class GameSessionManager {
         return set != null ? set.size() : 0;
     }
 
+    /**
+     * Returns the count of unique authenticated players with at least one active session.
+     */
+    public int getOnlinePlayerCount() {
+        return playerSessionsMap.size();
+    }
+
+    /**
+     * Returns the count of unique authenticated players in a specific game session.
+     */
+    public int getGameOnlinePlayerCount(UUID gameId) {
+        if (gameId == null) {
+            return getOnlinePlayerCount();
+        }
+        Set<String> sessionIds = gameSessionsMap.get(gameId);
+        if (sessionIds == null || sessionIds.isEmpty()) {
+            return 0;
+        }
+        return (int) sessionIds.stream()
+                .map(sessionPlayerMap::get)
+                .filter(id -> id != null)
+                .distinct()
+                .count();
+    }
+
     public boolean isPlayerConnected(UUID playerId) {
+        if (playerId == null) {
+            return false;
+        }
         Set<String> set = playerSessionsMap.get(playerId);
         return set != null && !set.isEmpty();
+    }
+
+    public UUID getPlayerId(WebSocketSession session) {
+        return sessionPlayerMap.get(session.getId());
+    }
+
+    public UUID getGameId(WebSocketSession session) {
+        return sessionGameMap.get(session.getId());
     }
 }

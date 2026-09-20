@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { memo, useState, useCallback } from 'react';
 import { GridCell } from './GridCell';
 import { CellTooltip } from './CellTooltip';
 import type { Cell } from '../../types/game';
@@ -12,10 +12,13 @@ interface GameBoardProps {
   highlightedOwnerId?: string | null;
   isMyTurn?: boolean;
   gameStatus?: 'WAITING' | 'ACTIVE' | 'FINISHED';
+  activePlayerName?: string;
+  playerCount?: number;
+  maxPlayers?: number;
   onClaimCell: (cellId: number) => void;
 }
 
-export function GameBoard({
+export const GameBoard = memo(function GameBoard({
   cells,
   currentUserId,
   playersMap,
@@ -24,6 +27,9 @@ export function GameBoard({
   highlightedOwnerId,
   isMyTurn = true,
   gameStatus,
+  activePlayerName,
+  playerCount,
+  maxPlayers,
   onClaimCell,
 }: GameBoardProps) {
   const [zoom, setZoom] = useState<number>(1);
@@ -59,6 +65,16 @@ export function GameBoard({
   );
 
   const activeAnimation = lastClaimAnimation;
+  const ownedByCurrent = new Set(cells.filter((cell) => cell.ownerId === currentUserId).map((cell) => `${cell.x},${cell.y}`));
+  const isFrontier = (cell: Cell) => {
+    if (cell.ownerId !== null || !isMyTurn || !currentUserId) return false;
+    for (let dy = -1; dy <= 1; dy += 1) {
+      for (let dx = -1; dx <= 1; dx += 1) {
+        if ((dx !== 0 || dy !== 0) && ownedByCurrent.has(`${cell.x + dx},${cell.y + dy}`)) return true;
+      }
+    }
+    return false;
+  };
 
   return (
     <div className="flex flex-col h-full bg-surface/60 border border-grid-line/80 rounded-2xl p-4 backdrop-blur-md shadow-2xl relative overflow-hidden">
@@ -126,7 +142,9 @@ export function GameBoard({
             ) : gameStatus === 'WAITING' ? (
               <>
                 <span className="w-2.5 h-2.5 rounded-full bg-accent animate-ping" />
-                <span>📡 WAITING FOR OPPONENT TO JOIN...</span>
+                <span>
+                  📡 WAITING FOR PLAYERS TO JOIN ({playerCount ?? 1}/{maxPlayers ?? 2})...
+                </span>
               </>
             ) : gameStatus === 'FINISHED' ? (
               <>
@@ -135,7 +153,9 @@ export function GameBoard({
             ) : (
               <>
                 <span className="w-2.5 h-2.5 rounded-full bg-warning" />
-                <span>⏳ OPPONENT'S TURN — AWAITING RIVAL MOVE...</span>
+                <span>
+                  ⏳ {activePlayerName ? `${activePlayerName.toUpperCase()}'S TURN` : "OPPONENT'S TURN"} — AWAITING MOVE...
+                </span>
               </>
             )}
           </div>
@@ -181,6 +201,9 @@ export function GameBoard({
                 y={cell.y}
                 ownerId={cell.ownerId}
                 ownerColor={ownerInfo?.color}
+                cellType={cell.cellType}
+                cellValue={cell.cellValue}
+                isFrontier={isFrontier(cell)}
                 isCurrentPlayer={isMine}
                 isClaiming={isClaiming}
                 isHighlighted={isHighlighted}
@@ -214,4 +237,4 @@ export function GameBoard({
       </div>
     </div>
   );
-}
+});

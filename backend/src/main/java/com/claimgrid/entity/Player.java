@@ -52,6 +52,10 @@ public class Player {
     @Column(name = "last_claim_at")
     private Instant lastClaimAt;
 
+    @Column(name = "is_bot", nullable = false)
+    @Builder.Default
+    private boolean bot = false;
+
     @PrePersist
     public void prePersist() {
         Instant now = Instant.now();

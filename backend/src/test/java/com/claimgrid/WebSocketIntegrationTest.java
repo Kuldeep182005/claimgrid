@@ -96,6 +96,10 @@ class WebSocketIntegrationTest extends BaseIntegrationTest {
         WebSocketSession session = connect("/ws/game", messages);
 
         assertThat(session.isOpen()).isTrue();
+        long deadline = System.currentTimeMillis() + 3000;
+        while (sessionManager.getActiveSessionCount() == 0 && System.currentTimeMillis() < deadline) {
+            Thread.sleep(50);
+        }
         assertThat(sessionManager.getActiveSessionCount()).isGreaterThanOrEqualTo(1);
     }
 
@@ -323,6 +327,7 @@ class WebSocketIntegrationTest extends BaseIntegrationTest {
         assertThat(joinJson.path("playerId").asText()).isEqualTo(player2.getId().toString());
         assertThat(joinJson.path("playerName").asText()).isEqualTo("Presence_P2");
         assertThat(joinJson.path("color").asText()).isEqualTo("#3B82F6");
+        assertThat(joinJson.path("onlineCount").asInt()).isGreaterThanOrEqualTo(2);
 
         // 5. Disconnect Client 2
         session2.close(CloseStatus.NORMAL);
@@ -333,6 +338,89 @@ class WebSocketIntegrationTest extends BaseIntegrationTest {
         JsonNode leftJson = objectMapper.readTree(leftMsg);
         assertThat(leftJson.path("type").asText()).isEqualTo("PLAYER_LEFT");
         assertThat(leftJson.path("playerId").asText()).isEqualTo(player2.getId().toString());
+        assertThat(leftJson.path("onlineCount").asInt()).isGreaterThanOrEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Section 19-K: Unique commander presence semantics — Multi-tab, duplicate prevention, and clean disconnect")
+    void testCommanderPresence_MultiTabAndDisconnect_Semantics() throws Exception {
+        Player playerA = playerRepository.save(Player.builder()
+                .username("Presence_Alpha")
+                .color("#10B981")
+                .cellsClaimed(0)
+                .createdAt(Instant.now())
+                .lastSeenAt(Instant.now())
+                .build());
+
+        Player playerB = playerRepository.save(Player.builder()
+                .username("Presence_Beta")
+                .color("#6366F1")
+                .cellsClaimed(0)
+                .createdAt(Instant.now())
+                .lastSeenAt(Instant.now())
+                .build());
+
+        int initialOnline = sessionManager.getOnlinePlayerCount();
+
+        // 1. One player connects -> online increases by 1
+        BlockingQueue<String> p1Tab1Msgs = new LinkedBlockingQueue<>();
+        WebSocketSession p1Tab1 = connect("/ws/game?playerId=" + playerA.getId(), p1Tab1Msgs);
+
+        // Verify PLAYER_JOINED received with onlineCount (confirms server registration complete)
+        String join1 = p1Tab1Msgs.poll(5, TimeUnit.SECONDS);
+        assertThat(join1).isNotNull();
+        assertThat(objectMapper.readTree(join1).path("type").asText()).isEqualTo("PLAYER_JOINED");
+        assertThat(sessionManager.getOnlinePlayerCount()).isEqualTo(initialOnline + 1);
+
+        // 2. Same player opens Tab 2 -> unique commanders remains the same (does NOT double count)
+        BlockingQueue<String> p1Tab2Msgs = new LinkedBlockingQueue<>();
+        WebSocketSession p1Tab2 = connect("/ws/game?playerId=" + playerA.getId(), p1Tab2Msgs);
+        Thread.sleep(150);
+        assertThat(sessionManager.getOnlinePlayerCount()).isEqualTo(initialOnline + 1);
+
+        // Tab 1 must NOT receive a duplicate PLAYER_JOINED for playerA
+        String dupJoin = p1Tab1Msgs.poll(500, TimeUnit.MILLISECONDS);
+        assertThat(dupJoin).isNull();
+
+        // 3. Second unique player connects -> online increases to initial + 2
+        BlockingQueue<String> p2Msgs = new LinkedBlockingQueue<>();
+        WebSocketSession p2Session = connect("/ws/game?playerId=" + playerB.getId(), p2Msgs);
+        String p2Join = p2Msgs.poll(5, TimeUnit.SECONDS);
+        assertThat(p2Join).isNotNull();
+        assertThat(sessionManager.getOnlinePlayerCount()).isEqualTo(initialOnline + 2);
+
+        // 4. Invalid/anonymous connection -> does NOT increase online commander count
+        BlockingQueue<String> anonMsgs = new LinkedBlockingQueue<>();
+        WebSocketSession anonSession = connect("/ws/game", anonMsgs);
+        Thread.sleep(150);
+        assertThat(sessionManager.getOnlinePlayerCount()).isEqualTo(initialOnline + 2);
+
+        // 5. Close Tab 1 of playerA -> playerA still has Tab 2 active, count remains initial + 2
+        p1Tab1.close(CloseStatus.NORMAL);
+        Thread.sleep(150);
+        assertThat(sessionManager.getOnlinePlayerCount()).isEqualTo(initialOnline + 2);
+
+        // Player B must NOT receive PLAYER_LEFT yet (playerA still has active tab)
+        String prematureLeft = p2Msgs.poll(500, TimeUnit.MILLISECONDS);
+        // Drain any previous JOIN messages if present
+        while (prematureLeft != null && objectMapper.readTree(prematureLeft).path("type").asText().equals("PLAYER_JOINED")) {
+            prematureLeft = p2Msgs.poll(500, TimeUnit.MILLISECONDS);
+        }
+        assertThat(prematureLeft).isNull();
+
+        // 6. Close final Tab 2 of playerA -> playerA is now completely offline, count decrements
+        p1Tab2.close(CloseStatus.NORMAL);
+        // Player B receives PLAYER_LEFT for playerA (confirms server removal complete)
+        String leftMsg = p2Msgs.poll(5, TimeUnit.SECONDS);
+        assertThat(leftMsg).isNotNull();
+        JsonNode leftNode = objectMapper.readTree(leftMsg);
+        assertThat(leftNode.path("type").asText()).isEqualTo("PLAYER_LEFT");
+        assertThat(leftNode.path("playerId").asText()).isEqualTo(playerA.getId().toString());
+        assertThat(sessionManager.getOnlinePlayerCount()).isEqualTo(initialOnline + 1);
+
+        // Cleanup
+        p2Session.close(CloseStatus.NORMAL);
+        anonSession.close(CloseStatus.NORMAL);
     }
 
     @Test

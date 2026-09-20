@@ -11,8 +11,9 @@ export function GameEndOverlay({ player, battleSession, onReturnToLobby }: GameE
   const isVictory = battleSession.winnerId === player.id;
   const isDraw = battleSession.winnerId === null;
 
-  const playerStats = battleSession.players.find((p) => p.id === player.id);
-  const rivalStats = battleSession.players.find((p) => p.id !== player.id);
+  const rankedPlayers = [...(battleSession.players ?? [])].sort(
+    (a, b) => (b.score ?? b.cellsClaimed) - (a.score ?? a.cellsClaimed)
+  );
 
   return (
     <div
@@ -52,26 +53,55 @@ export function GameEndOverlay({ player, battleSession, onReturnToLobby }: GameE
           </p>
         </div>
 
-        {/* Head-to-Head Final Stats */}
-        <div className="grid grid-cols-2 gap-3 bg-surface-elevated/70 border border-grid-line/60 rounded-xl p-4">
-          <div className="text-left space-y-1">
-            <span className="text-[11px] font-mono text-text-muted uppercase">YOU</span>
-            <div className="text-sm font-bold truncate text-text-primary">{player.username}</div>
-            <div className="text-2xl font-black font-mono text-accent">
-              {playerStats?.cellsClaimed ?? 0}
-              <span className="text-xs font-normal text-text-muted ml-1">cells</span>
-            </div>
+        {/* Final Standings (Supports 2 or 4 Players) */}
+        <div className="flex flex-col gap-2 bg-surface-elevated/70 border border-grid-line/60 rounded-xl p-4">
+          <div className="text-[11px] font-mono text-text-muted uppercase tracking-wider text-left pb-1 border-b border-grid-line/40">
+            FINAL STANDINGS
           </div>
+          <div className="flex flex-col gap-2">
+            {rankedPlayers.map((p, idx) => {
+              const isSelf = p.id === player.id;
+              const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '4️⃣';
+              const score = p.score ?? p.cellsClaimed;
 
-          <div className="text-right space-y-1 border-l border-grid-line/60 pl-3">
-            <span className="text-[11px] font-mono text-text-muted uppercase">RIVAL</span>
-            <div className="text-sm font-bold truncate text-text-primary">
-              {rivalStats?.username ?? 'Opponent'}
-            </div>
-            <div className="text-2xl font-black font-mono text-text-secondary">
-              {rivalStats?.cellsClaimed ?? 0}
-              <span className="text-xs font-normal text-text-muted ml-1">cells</span>
-            </div>
+              return (
+                <div
+                  key={p.id}
+                  className={`flex items-center justify-between p-2.5 rounded-lg border transition-all ${
+                    isSelf
+                      ? 'bg-surface-elevated border-accent/60 shadow-sm'
+                      : 'bg-surface/50 border-grid-line/40'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-base shrink-0">{medal}</span>
+                    <span
+                      className="w-3 h-3 rounded-full shrink-0 shadow-sm ring-1 ring-white/20"
+                      style={{ backgroundColor: p.color }}
+                    />
+                    <div className="min-w-0 flex items-center gap-1.5">
+                      <span className="font-bold text-xs text-text-primary truncate">
+                        {p.username}
+                      </span>
+                      {isSelf && (
+                        <span className="text-[9px] font-mono font-black uppercase px-1 py-0.2 rounded bg-accent/20 text-accent border border-accent/30">
+                          YOU
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-[11px] font-mono text-text-muted">
+                      {p.cellsClaimed} {p.cellsClaimed === 1 ? 'cell' : 'cells'}
+                    </span>
+                    <span className="font-black font-mono text-xs text-accent">
+                      {score} PTS
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 

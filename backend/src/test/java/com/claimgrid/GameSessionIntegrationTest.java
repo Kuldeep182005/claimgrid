@@ -143,9 +143,8 @@ class GameSessionIntegrationTest extends BaseIntegrationTest {
         GameSessionResponse session = battleSessionService.createGame(player1.getId());
         battleSessionService.joinGame(session.getCode(), player2.getId());
 
-        List<Cell> cells = cellRepository.findBySessionIdOrderByYAscXAsc(session.getGameId());
-        Cell cell1 = cells.get(0);
-        Cell cell2 = cells.get(1);
+        Cell cell1 = cellRepository.findBySessionIdAndXAndY(session.getGameId(), 8, 7).orElseThrow();
+        Cell cell2 = cellRepository.findBySessionIdAndXAndY(session.getGameId(), 16, 17).orElseThrow();
 
         // Player 1's turn -> should succeed
         ClaimCellResponse claim1 = claimService.claimCell(session.getGameId(), player1.getId(), cell1.getId());
@@ -190,9 +189,8 @@ class GameSessionIntegrationTest extends BaseIntegrationTest {
         GameSessionResponse session = battleSessionService.createGame(player1.getId());
         battleSessionService.joinGame(session.getCode(), player2.getId());
 
-        List<Cell> cells = cellRepository.findBySessionIdOrderByYAscXAsc(session.getGameId());
-        Cell cell1 = cells.get(10);
-        Cell cell2 = cells.get(11);
+        Cell cell1 = cellRepository.findBySessionIdAndXAndY(session.getGameId(), 8, 7).orElseThrow();
+        Cell cell2 = cellRepository.findBySessionIdAndXAndY(session.getGameId(), 16, 17).orElseThrow();
 
         int threadCount = 2;
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
@@ -276,7 +274,7 @@ class GameSessionIntegrationTest extends BaseIntegrationTest {
         assertThat(state.getCurrentPlayerId()).isEqualTo(player1.getId());
 
         // 4. POST /api/games/{gameId}/cells/{cellId}/claim
-        Long firstCellId = state.getCells().get(0).getId();
+        Long firstCellId = cellRepository.findBySessionIdAndXAndY(joined.getGameId(), 8, 7).orElseThrow().getId();
         ClaimCellRequest claimReq = new ClaimCellRequest(player1.getId());
         ResponseEntity<ClaimCellResponse> claimResp = restTemplate.postForEntity(
                 "/api/games/" + joined.getGameId() + "/cells/" + firstCellId + "/claim",

@@ -16,4 +16,5 @@ public class PlayerSummaryDto {
     private String username;
     private String color;
     private int cellsClaimed;
+    private int score;
 }

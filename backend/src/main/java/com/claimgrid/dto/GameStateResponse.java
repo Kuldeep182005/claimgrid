@@ -18,4 +18,5 @@ public class GameStateResponse {
     private long totalCells;
     private long claimedCells;
     private List<CellResponse> cells;
+    private int onlineCount;
 }
