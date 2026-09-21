@@ -11,10 +11,6 @@ interface GameBoardProps {
   lastClaimAnimation: { cellId: number; isSelf: boolean; timestamp: number } | null;
   highlightedOwnerId?: string | null;
   isMyTurn?: boolean;
-  gameStatus?: 'WAITING' | 'ACTIVE' | 'FINISHED';
-  activePlayerName?: string;
-  playerCount?: number;
-  maxPlayers?: number;
   onClaimCell: (cellId: number) => void;
 }
 
@@ -26,10 +22,6 @@ export const GameBoard = memo(function GameBoard({
   lastClaimAnimation,
   highlightedOwnerId,
   isMyTurn = true,
-  gameStatus,
-  activePlayerName,
-  playerCount,
-  maxPlayers,
   onClaimCell,
 }: GameBoardProps) {
   const [zoom, setZoom] = useState<number>(1);
@@ -64,8 +56,9 @@ export const GameBoard = memo(function GameBoard({
     [playersMap]
   );
 
-  const activeAnimation = lastClaimAnimation;
-  const ownedByCurrent = new Set(cells.filter((cell) => cell.ownerId === currentUserId).map((cell) => `${cell.x},${cell.y}`));
+  const ownedByCurrent = new Set(
+    cells.filter((cell) => cell.ownerId === currentUserId).map((cell) => `${cell.x},${cell.y}`)
+  );
   const isFrontier = (cell: Cell) => {
     if (cell.ownerId !== null || !isMyTurn || !currentUserId) return false;
     for (let dy = -1; dy <= 1; dy += 1) {
@@ -77,22 +70,20 @@ export const GameBoard = memo(function GameBoard({
   };
 
   return (
-    <div className="flex flex-col h-full bg-surface/60 border border-grid-line/80 rounded-2xl p-4 backdrop-blur-md shadow-2xl relative overflow-hidden">
-      {/* Top Controls Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-grid-line/60 mb-3">
-        {/* Cell Inspector Tooltip */}
-        <div className="flex-1 min-w-[280px]">
+    <div className="flex flex-col h-full bg-surface border border-grid-line rounded-2xl p-3 sm:p-4 shadow-xl shadow-black/20 relative">
+      {/* Inspector + zoom */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3">
+        <div className="flex-1 min-w-[240px]">
           <CellTooltip info={hoveredCell} currentUserId={currentUserId} />
         </div>
 
-        {/* Viewport Zoom Controls with micro-interactions */}
-        <div className="flex items-center gap-1.5 bg-surface-elevated/80 border border-grid-line rounded-lg p-1 shadow-sm">
+        <div className="flex items-center gap-1 bg-surface-elevated border border-grid-line rounded-lg p-1">
           <button
             type="button"
             onClick={handleZoomOut}
             disabled={zoom <= 0.75}
-            title="Zoom Out"
-            className="p-1.5 text-text-muted hover:text-text-primary disabled:opacity-30 rounded hover:bg-surface hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-150 cursor-pointer"
+            aria-label="Zoom out"
+            className="p-1.5 text-text-muted hover:text-text-primary disabled:opacity-30 rounded-md hover:bg-grid-cell active:scale-95 transition-all cursor-pointer"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
@@ -101,8 +92,7 @@ export const GameBoard = memo(function GameBoard({
           <button
             type="button"
             onClick={handleResetZoom}
-            title="Reset Zoom (100%)"
-            className="px-2 py-1 text-xs font-mono text-text-secondary hover:text-text-primary rounded hover:bg-surface hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-150 cursor-pointer"
+            className="px-2 py-1 text-xs font-medium text-text-secondary hover:text-text-primary rounded-md hover:bg-grid-cell active:scale-95 transition-all cursor-pointer tabular-nums"
           >
             {Math.round(zoom * 100)}%
           </button>
@@ -110,8 +100,8 @@ export const GameBoard = memo(function GameBoard({
             type="button"
             onClick={handleZoomIn}
             disabled={zoom >= 2}
-            title="Zoom In"
-            className="p-1.5 text-text-muted hover:text-text-primary disabled:opacity-30 rounded hover:bg-surface hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-150 cursor-pointer"
+            aria-label="Zoom in"
+            className="p-1.5 text-text-muted hover:text-text-primary disabled:opacity-30 rounded-md hover:bg-grid-cell active:scale-95 transition-all cursor-pointer"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -120,65 +110,20 @@ export const GameBoard = memo(function GameBoard({
         </div>
       </div>
 
-      {/* Prominent Turn Directive Banner (Part 16) */}
-      {gameStatus && (
-        <div
-          className={`w-full py-2 px-4 rounded-xl text-xs font-mono font-bold tracking-wider uppercase flex items-center justify-between border mb-3 transition-all duration-300 ${
-            gameStatus === 'WAITING'
-              ? 'bg-accent/15 border-accent/40 text-accent'
-              : gameStatus === 'FINISHED'
-              ? 'bg-surface-elevated border-grid-line text-text-muted'
-              : isMyTurn
-              ? 'bg-success/20 border-success/60 text-success shadow-[0_0_12px_rgba(16,185,129,0.25)] animate-pulse'
-              : 'bg-warning/15 border-warning/40 text-warning'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            {isMyTurn && gameStatus === 'ACTIVE' ? (
-              <>
-                <span className="w-2.5 h-2.5 rounded-full bg-success animate-ping" />
-                <span>⚡ YOUR TURN — CLAIM AN UNOWNED SECTOR</span>
-              </>
-            ) : gameStatus === 'WAITING' ? (
-              <>
-                <span className="w-2.5 h-2.5 rounded-full bg-accent animate-ping" />
-                <span>
-                  📡 WAITING FOR PLAYERS TO JOIN ({playerCount ?? 1}/{maxPlayers ?? 2})...
-                </span>
-              </>
-            ) : gameStatus === 'FINISHED' ? (
-              <>
-                <span>🏁 BATTLE CONCLUDED</span>
-              </>
-            ) : (
-              <>
-                <span className="w-2.5 h-2.5 rounded-full bg-warning" />
-                <span>
-                  ⏳ {activePlayerName ? `${activePlayerName.toUpperCase()}'S TURN` : "OPPONENT'S TURN"} — AWAITING MOVE...
-                </span>
-              </>
-            )}
-          </div>
-          <span className="text-[11px] font-normal opacity-80">
-            {cells.filter((c) => c.ownerId !== null).length} / {cells.length} Claimed
-          </span>
-        </div>
-      )}
-
-      {/* Grid Canvas Container */}
-      <div className="flex-1 overflow-auto flex items-center justify-center p-2 min-h-[420px]">
+      {/* The grid — the star of the screen */}
+      <div className="flex-1 overflow-auto flex items-center justify-center p-1 min-h-[420px]">
         <div
           style={{
             transform: `scale(${zoom})`,
             transformOrigin: 'center center',
             transition: 'transform 0.15s ease-out',
-            width: 'min(78vh, 78vw, 760px)',
-            height: 'min(78vh, 78vw, 760px)',
+            width: 'min(78vh, 88vw, 760px)',
+            height: 'min(78vh, 88vw, 760px)',
             gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))`,
             gridTemplateRows: `repeat(${gridSize}, minmax(0, 1fr))`,
           }}
-          className={`grid gap-[2px] p-2.5 bg-surface-elevated/40 border border-grid-line rounded-lg shadow-inner select-none relative ${
-            !isMyTurn ? 'opacity-90' : ''
+          className={`grid gap-[2px] p-2 bg-grid-bg border border-grid-line rounded-xl select-none relative transition-opacity duration-200 ${
+            !isMyTurn ? 'opacity-80' : ''
           }`}
         >
           {cells.map((cell) => {
@@ -186,11 +131,11 @@ export const GameBoard = memo(function GameBoard({
             const isMine = currentUserId ? cell.ownerId === currentUserId : false;
             const isClaiming = claimingCellId === cell.id;
             const isHighlighted = highlightedOwnerId ? cell.ownerId === highlightedOwnerId : false;
-            const isDimmed = highlightedOwnerId ? (cell.ownerId !== null && cell.ownerId !== highlightedOwnerId) : false;
+            const isDimmed = highlightedOwnerId ? cell.ownerId !== null && cell.ownerId !== highlightedOwnerId : false;
 
             let animType: 'self' | 'remote' | null = null;
-            if (activeAnimation && activeAnimation.cellId === cell.id) {
-              animType = activeAnimation.isSelf ? 'self' : 'remote';
+            if (lastClaimAnimation && lastClaimAnimation.cellId === cell.id) {
+              animType = lastClaimAnimation.isSelf ? 'self' : 'remote';
             }
 
             return (
@@ -217,23 +162,25 @@ export const GameBoard = memo(function GameBoard({
         </div>
       </div>
 
-      {/* Subtle bottom legend */}
-      <div className="pt-2 border-t border-grid-line/40 flex items-center justify-between text-[11px] font-mono text-text-muted">
+      {/* Quiet legend */}
+      <div className="pt-3 flex items-center justify-between text-xs text-text-muted">
         <div className="flex items-center gap-4">
           <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-[2px] bg-grid-cell border border-grid-line" />
-            Neutral Sector
+            <span className="w-3 h-3 rounded-[3px] bg-grid-cell border border-grid-line" />
+            Empty
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-[2px] bg-accent ring-1 ring-white/60" />
-            Your Territory
+            <span className="w-3 h-3 rounded-[3px] bg-accent" />
+            Yours
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-[2px] bg-danger/80" />
-            Rival Factions
+            <span className="w-3 h-3 rounded-[3px] bg-danger" />
+            Others
           </span>
         </div>
-        <span>{gridSize} × {gridSize} ({cells.length} SECTORS)</span>
+        <span className="tabular-nums">
+          {gridSize} × {gridSize}
+        </span>
       </div>
     </div>
   );
