@@ -102,7 +102,7 @@ export function BattleSelectModal({ isOpen, player, onClose, onEnterBattle }: Ba
         }
       };
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to create battle session';
+      const msg = err instanceof Error ? err.message : 'Could not create the game. Try again.';
       setError(msg);
       sound.playError();
     } finally {
@@ -115,7 +115,7 @@ export function BattleSelectModal({ isOpen, player, onClose, onEnterBattle }: Ba
     e.preventDefault();
     const cleanCode = joinCode.trim().toUpperCase();
     if (cleanCode.length < 4) {
-      setError('Enter a valid battle code');
+      setError('Enter a valid game code');
       sound.playError();
       return;
     }
@@ -127,7 +127,7 @@ export function BattleSelectModal({ isOpen, player, onClose, onEnterBattle }: Ba
       sound.playClaimSuccess();
       onEnterBattle(session);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to join battle';
+      const msg = err instanceof Error ? err.message : 'Could not join that game';
       setError(msg);
       sound.playError();
     } finally {
@@ -145,94 +145,64 @@ export function BattleSelectModal({ isOpen, player, onClose, onEnterBattle }: Ba
 
   if (!isOpen) return null;
 
+  const title =
+    view === 'CREATE'
+      ? (createdSession ? 'Share the code' : 'Create game')
+      : view === 'JOIN'
+      ? 'Join game'
+      : 'Multiplayer';
+
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="battle-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) handleClose(); }}
     >
-      <div className="relative w-full max-w-md bg-surface/95 border border-accent/60 rounded-2xl p-6 sm:p-8 shadow-2xl glow-accent flex flex-col gap-6">
+      <div className="relative w-full max-w-sm bg-surface border border-grid-line rounded-2xl p-6 shadow-2xl shadow-black/50 flex flex-col gap-5 animate-pop-in">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-grid-line/60">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-accent/20 border border-accent flex items-center justify-center text-accent">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <div>
-              <h2 id="battle-modal-title" className="text-lg font-black tracking-wide text-text-primary uppercase">
-                {view === 'CREATE'
-                  ? (selectedPlayers === 4 ? '4-PLAYER BATTLE' : '2-PLAYER BATTLE')
-                  : view === 'JOIN'
-                  ? 'JOIN BATTLE'
-                  : 'MULTIPLAYER BATTLE'}
-              </h2>
-              <span className="text-xs font-mono text-accent">
-                25 × 25 GRID • TURN-BASED COMBAT
-              </span>
-            </div>
-          </div>
-
+        <div className="flex items-center justify-between">
+          <h2 id="battle-modal-title" className="font-display text-xl font-semibold text-text-primary">
+            {title}
+          </h2>
           <button
             type="button"
             onClick={handleClose}
-            aria-label="Close battle modal"
-            className="p-2 rounded-xl text-text-muted hover:text-text-primary hover:bg-surface-elevated border border-transparent hover:border-grid-line transition-all cursor-pointer"
+            aria-label="Close"
+            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-elevated transition-all cursor-pointer"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
         {error && (
-          <div className="p-3 rounded-lg bg-danger/10 border border-danger/30 text-danger text-xs font-mono flex items-center gap-2">
-            <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            {error}
-          </div>
+          <p className="text-sm text-danger" role="alert">{error}</p>
         )}
 
-        {/* View 1: SELECT (Choose Create or Join) */}
+        {/* View 1: SELECT */}
         {view === 'SELECT' && (
-          <div className="space-y-4">
-            <p className="text-xs font-mono text-text-secondary">
-              Deploy to a private tactical sector. Choose match capacity, create a room and share the code, or join an existing battle code.
-            </p>
-
-            {/* Player Count Selector (Part 6) */}
-            <div className="space-y-2">
-              <label className="block text-xs font-mono font-bold text-text-muted uppercase tracking-wider">
-                PLAYERS
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  id="select-2-players"
-                  onClick={() => setSelectedPlayers(2)}
-                  className={`py-2.5 px-4 rounded-xl font-bold font-mono text-sm tracking-wider uppercase transition-all duration-150 cursor-pointer flex items-center justify-center gap-2 border ${
-                    selectedPlayers === 2
-                      ? 'bg-accent/20 border-accent text-accent shadow-[0_0_12px_rgba(99,102,241,0.3)] ring-1 ring-accent'
-                      : 'bg-surface-elevated/60 border-grid-line text-text-muted hover:text-text-primary hover:border-grid-line/80'
-                  }`}
-                >
-                  <span>2 PLAYERS</span>
-                </button>
-                <button
-                  type="button"
-                  id="select-4-players"
-                  onClick={() => setSelectedPlayers(4)}
-                  className={`py-2.5 px-4 rounded-xl font-bold font-mono text-sm tracking-wider uppercase transition-all duration-150 cursor-pointer flex items-center justify-center gap-2 border ${
-                    selectedPlayers === 4
-                      ? 'bg-accent/20 border-accent text-accent shadow-[0_0_12px_rgba(99,102,241,0.3)] ring-1 ring-accent'
-                      : 'bg-surface-elevated/60 border-grid-line text-text-muted hover:text-text-primary hover:border-grid-line/80'
-                  }`}
-                >
-                  <span>4 PLAYERS</span>
-                </button>
+          <div className="flex flex-col gap-5">
+            <div>
+              <span className="block text-xs font-medium text-text-muted mb-2">Players</span>
+              <div className="grid grid-cols-2 gap-2">
+                {([2, 4] as const).map((count) => (
+                  <button
+                    key={count}
+                    type="button"
+                    id={`select-${count}-players`}
+                    onClick={() => setSelectedPlayers(count)}
+                    className={`py-3 rounded-lg font-display text-lg font-semibold transition-all cursor-pointer border ${
+                      selectedPlayers === count
+                        ? 'bg-accent text-[#231b09] border-accent'
+                        : 'bg-surface-elevated border-grid-line text-text-secondary hover:text-text-primary hover:border-grid-line'
+                    }`}
+                  >
+                    {count}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -240,131 +210,103 @@ export function BattleSelectModal({ isOpen, player, onClose, onEnterBattle }: Ba
               type="button"
               onClick={handleCreateBattle}
               disabled={loading}
-              className="w-full py-4 px-6 rounded-xl font-bold text-sm tracking-wider uppercase bg-accent hover:bg-accent-glow text-white shadow-lg hover:shadow-accent/40 active:scale-[0.97] hover:-translate-y-0.5 transition-all duration-150 flex items-center justify-between cursor-pointer"
+              className="w-full py-3.5 rounded-lg font-display font-semibold text-base bg-accent hover:bg-accent-glow text-[#231b09] active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer"
             >
-              <div className="flex items-center gap-3">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                <span>CREATE {selectedPlayers}-PLAYER BATTLE</span>
-              </div>
-              <span className="text-xs font-mono opacity-80">Host 25×25</span>
+              {loading ? 'Creating...' : 'Create game'}
             </button>
+
+            <div className="flex items-center gap-3 text-xs text-text-muted">
+              <span className="flex-1 h-px bg-grid-line" />
+              or
+              <span className="flex-1 h-px bg-grid-line" />
+            </div>
 
             <button
               type="button"
               onClick={() => { setView('JOIN'); setError(null); }}
               disabled={loading}
-              className="w-full py-4 px-6 rounded-xl font-bold text-sm tracking-wider uppercase bg-surface-elevated hover:bg-surface-elevated/80 border border-grid-line/80 hover:border-accent text-text-primary shadow-sm hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-150 flex items-center justify-between cursor-pointer"
+              className="w-full py-3.5 rounded-lg font-medium text-base bg-surface-elevated border border-grid-line hover:border-accent/50 text-text-primary active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer"
             >
-              <div className="flex items-center gap-3">
-                <svg className="w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                </svg>
-                <span>JOIN BATTLE</span>
-              </div>
-              <span className="text-xs font-mono text-text-muted">Enter Code</span>
+              Join with a code
             </button>
           </div>
         )}
 
-        {/* View 2: CREATE (Waiting for opponent) */}
+        {/* View 2: CREATE (waiting) */}
         {view === 'CREATE' && createdSession && (
-          <div className="space-y-5 text-center">
-            <div className="p-4 rounded-xl bg-surface-elevated/90 border border-accent/40 space-y-3">
-              <span className="text-xs font-mono text-text-muted uppercase tracking-widest">
-                SHARE THIS BATTLE CODE
-              </span>
-              <div className="text-3xl sm:text-4xl font-black font-mono tracking-widest text-accent selection:bg-accent selection:text-black">
-                {createdSession.code}
-              </div>
-              <button
-                type="button"
-                onClick={handleCopyCode}
-                className="py-2 px-4 rounded-lg font-mono text-xs uppercase tracking-wider bg-accent/20 hover:bg-accent/30 text-accent border border-accent/40 hover:border-accent active:scale-95 transition-all cursor-pointer inline-flex items-center gap-2"
-              >
-                {copied ? (
-                  <>
-                    <svg className="w-3.5 h-3.5 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                    COPIED TO CLIPBOARD!
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    COPY BATTLE CODE
-                  </>
-                )}
-              </button>
-            </div>
+          <div className="flex flex-col gap-5 text-center">
+            <p className="text-sm text-text-secondary">
+              Send this code to a friend. The game starts automatically when everyone joins.
+            </p>
 
-            {/* Radar waiting indicator */}
-            <div className="flex flex-col items-center gap-2 text-xs font-mono text-text-secondary py-2">
-              <div className="relative w-12 h-12 flex items-center justify-center">
-                <div className="absolute inset-0 rounded-full border border-accent/30 animate-ping" />
-                <div className="w-4 h-4 rounded-full bg-accent animate-pulse" />
-              </div>
-              <p className="font-bold text-text-primary uppercase tracking-wider">
-                {selectedPlayers === 4
-                  ? `WAITING FOR PLAYERS (${joinedPlayersCount}/4)...`
-                  : 'WAITING FOR OPPONENT TO JOIN...'}
-              </p>
-              <p className="text-text-muted text-[11px]">
-                {selectedPlayers === 4
-                  ? 'All 4 commanders will deploy to the battlefield automatically once joined.'
-                  : 'Both commanders will deploy to the battlefield automatically.'}
-              </p>
+            <button
+              type="button"
+              onClick={handleCopyCode}
+              className="group relative py-5 rounded-xl bg-surface-elevated border border-grid-line hover:border-accent/60 transition-all cursor-pointer"
+              aria-label="Copy game code"
+            >
+              <span className="font-display text-4xl font-bold tracking-[0.25em] text-accent">
+                {createdSession.code}
+              </span>
+              <span className="block mt-1.5 text-xs text-text-muted">
+                {copied ? 'Copied' : 'Tap to copy'}
+              </span>
+            </button>
+
+            <div className="flex items-center justify-center gap-2.5 text-sm text-text-secondary">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-accent opacity-60 animate-ping" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-accent" />
+              </span>
+              {selectedPlayers === 4
+                ? `Waiting for players — ${joinedPlayersCount}/4`
+                : 'Waiting for opponent...'}
             </div>
 
             <button
               type="button"
               onClick={() => { setView('SELECT'); setCreatedSession(null); }}
-              className="text-xs font-mono text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+              className="text-sm text-text-muted hover:text-text-primary transition-colors cursor-pointer"
             >
-              Cancel Battle
+              Cancel
             </button>
           </div>
         )}
 
-        {/* View 3: JOIN (Enter code) */}
+        {/* View 3: JOIN */}
         {view === 'JOIN' && (
-          <form onSubmit={handleJoinBattle} className="space-y-4">
+          <form onSubmit={handleJoinBattle} className="flex flex-col gap-4">
             <div>
-              <label htmlFor="battle-code-input" className="block text-xs font-mono font-medium text-text-muted uppercase tracking-wider mb-2">
-                ENTER 6-CHARACTER BATTLE CODE
+              <label htmlFor="battle-code-input" className="block text-xs font-medium text-text-muted mb-2">
+                Game code
               </label>
               <input
                 id="battle-code-input"
                 type="text"
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase().slice(0, 10))}
-                placeholder="e.g. X7K92P"
+                placeholder="ABC123"
                 autoFocus
                 disabled={loading}
-                className="w-full px-4 py-3 bg-surface-elevated border border-grid-line rounded-xl text-text-primary text-center font-mono text-2xl font-bold tracking-widest placeholder:text-text-muted/40 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all"
+                className="w-full px-4 py-4 bg-surface-elevated border border-grid-line rounded-lg text-text-primary text-center font-display text-3xl font-bold tracking-[0.25em] placeholder:text-text-muted/40 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 transition-all uppercase"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading || joinCode.trim().length < 4}
-              className="w-full py-3.5 px-6 rounded-xl font-bold text-sm tracking-wider uppercase bg-accent hover:bg-accent-glow text-white shadow-lg hover:shadow-accent/40 active:scale-[0.97] hover:-translate-y-0.5 transition-all duration-150 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-3.5 rounded-lg font-display font-semibold text-base bg-accent hover:bg-accent-glow text-[#231b09] active:scale-[0.98] transition-all disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
             >
-              {loading ? 'Joining Battle...' : 'ENTER BATTLEFIELD'}
+              {loading ? 'Joining...' : 'Join game'}
             </button>
 
-            <div className="text-center pt-1">
-              <button
-                type="button"
-                onClick={() => { setView('SELECT'); setError(null); }}
-                className="text-xs font-mono text-text-muted hover:text-text-primary transition-colors cursor-pointer"
-              >
-                Back to Battle Options
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => { setView('SELECT'); setError(null); }}
+              className="text-sm text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+            >
+              Back
+            </button>
           </form>
         )}
       </div>

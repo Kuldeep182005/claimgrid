@@ -1,169 +1,151 @@
 @import "tailwindcss";
 
 /* ================================
-   ClaimGrid — Tactical Design System
+   ClaimGrid — Design System
+   Warm charcoal · one gold accent · the grid is the star
    ================================ */
 
 @theme {
-  --color-grid-bg: #0b0c16;
-  --color-grid-line: #1b1c31;
-  --color-grid-cell: #131424;
-  --color-grid-cell-hover: #232545;
-  --color-surface: #101120;
-  --color-surface-elevated: #181a30;
-  --color-surface-glass: rgba(16, 17, 32, 0.85);
-  --color-accent: #6366f1;
-  --color-accent-glow: #818cf8;
-  --color-accent-bright: #4f46e5;
-  --color-success: #10b981;
-  --color-danger: #ef4444;
-  --color-warning: #f59e0b;
-  --color-text-primary: #f8fafc;
-  --color-text-secondary: #94a3b8;
-  --color-text-muted: #64748b;
+  /* Surfaces — warm neutral charcoal */
+  --color-grid-bg: #17150f;
+  --color-grid-line: #322d24;
+  --color-grid-cell: #262119;
+  --color-grid-cell-hover: #3a3226;
+  --color-surface: #201c15;
+  --color-surface-elevated: #2a251c;
+  --color-surface-glass: rgba(32, 28, 21, 0.9);
+
+  /* One strong primary accent — warm gold */
+  --color-accent: #e8b44b;
+  --color-accent-glow: #f4cd77;
+  --color-accent-bright: #d69a2e;
+
+  /* Semantic */
+  --color-success: #5cbd86;
+  --color-danger: #e06a5c;
+  --color-warning: #e0a53a;
+
+  /* Text — warm off-white */
+  --color-text-primary: #f4efe4;
+  --color-text-secondary: #b6ada0;
+  --color-text-muted: #857c6f;
+
+  /* Type */
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Space Grotesk", var(--font-sans);
 }
 
 @layer base {
   body {
     background-color: var(--color-grid-bg);
     color: var(--color-text-primary);
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-family: var(--font-sans);
     overflow-x: hidden;
     user-select: none;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
   }
 }
 
-/* Tactical CRT / Scanline effect for header & radar */
-.tactical-scanline {
-  background: linear-gradient(
-    rgba(18, 16, 38, 0) 50%,
-    rgba(0, 0, 0, 0.25) 50%
-  ), linear-gradient(
-    90deg,
-    rgba(255, 0, 0, 0.03),
-    rgba(0, 255, 0, 0.01),
-    rgba(0, 0, 255, 0.03)
-  );
-  background-size: 100% 2px, 3px 100%;
+/* ================================
+   Motion — small, fast, satisfying
+   ================================ */
+
+/* Claim by you: a confident pop-in */
+@keyframes claim-pop-self {
+  0% { transform: scale(0.55); }
+  55% { transform: scale(1.12); }
+  100% { transform: scale(1); }
 }
 
-/* Subtle glow effects */
-.glow-accent {
-  box-shadow: 0 0 15px -2px rgba(99, 102, 241, 0.4);
-}
-
-.glow-success {
-  box-shadow: 0 0 15px -2px rgba(16, 185, 129, 0.5);
-}
-
-.glow-cell {
-  box-shadow: 0 0 12px 1px var(--glow-color, rgba(99, 102, 241, 0.6));
-}
-
-/* Animations */
-@keyframes claim-pulse-self {
-  0% {
-    transform: scale(1.4);
-    box-shadow: 0 0 24px 6px var(--claim-color, #6366f1);
-    z-index: 20;
-  }
-  60% {
-    transform: scale(1.1);
-    box-shadow: 0 0 12px 2px var(--claim-color, #6366f1);
-  }
-  100% {
-    transform: scale(1);
-    box-shadow: none;
-    z-index: 1;
-  }
-}
-
-@keyframes claim-pulse-remote {
-  0% {
-    transform: scale(1.3);
-    box-shadow: 0 0 16px 3px var(--claim-color, #ef4444);
-    z-index: 15;
-  }
-  100% {
-    transform: scale(1);
-    box-shadow: none;
-    z-index: 1;
-  }
-}
-
-@keyframes radar-ping {
-  0% {
-    transform: scale(0.8);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(2.2);
-    opacity: 0;
-  }
+/* Claim by opponent: a softer settle */
+@keyframes claim-pop-remote {
+  0% { transform: scale(0.7); }
+  100% { transform: scale(1); }
 }
 
 .animate-claim-self {
-  animation: claim-pulse-self 0.6s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+  animation: claim-pop-self 0.34s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
 }
 
 .animate-claim-remote {
-  animation: claim-pulse-remote 0.45s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
-}
-
-.animate-radar {
-  animation: radar-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+  animation: claim-pop-remote 0.28s cubic-bezier(0.2, 0.9, 0.3, 1) both;
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .animate-fadeIn {
-  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeIn 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Custom scrollbars */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+@keyframes pop-in {
+  0% { opacity: 0; transform: scale(0.94); }
+  100% { opacity: 1; transform: scale(1); }
 }
-::-webkit-scrollbar-track {
-  background: var(--color-surface);
+
+.animate-pop-in {
+  animation: pop-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
 }
+
+/* Gentle breathing highlight for available moves / active turn */
+@keyframes soft-glow {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.animate-soft-glow {
+  animation: soft-glow 1.8s ease-in-out infinite;
+}
+
+/* Score number tick */
+@keyframes score-bump {
+  0% { transform: translateY(0); }
+  40% { transform: translateY(-4px); color: var(--color-accent); }
+  100% { transform: translateY(0); }
+}
+
+.animate-score-bump {
+  animation: score-bump 0.4s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+/* Victory confetti-free celebration: a warm sweep */
+@keyframes celebrate {
+  0% { transform: scale(0.9); opacity: 0; }
+  60% { transform: scale(1.03); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-celebrate {
+  animation: celebrate 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
+}
+
+/* ================================
+   Scrollbars — quiet
+   ================================ */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-surface-elevated);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
   background: var(--color-grid-line);
+  border-radius: 999px;
 }
+::-webkit-scrollbar-thumb:hover { background: var(--color-surface-elevated); }
 
-/* ==============================================
-   Accessibility — Prefers Reduced Motion Support
-   ============================================== */
+/* ================================
+   Reduced motion
+   ================================ */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
-  }
-
-  .animate-claim-self,
-  .animate-claim-remote,
-  .animate-radar,
-  .animate-pulse,
-  .animate-ping {
-    animation: none !important;
   }
 }

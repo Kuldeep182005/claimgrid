@@ -44,16 +44,14 @@ export const GridCell = React.memo(function GridCell({
     style['--claim-color'] = ownerColor;
   }
 
-  const animationClass = animationType === 'self'
-    ? 'animate-claim-self'
-    : animationType === 'remote'
-    ? 'animate-claim-remote'
-    : '';
+  const animationClass =
+    animationType === 'self'
+      ? 'animate-claim-self'
+      : animationType === 'remote'
+      ? 'animate-claim-remote'
+      : '';
 
-  const handleClick = () => {
-    onSelect(id);
-  };
-
+  const handleClick = () => onSelect(id);
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -65,7 +63,9 @@ export const GridCell = React.memo(function GridCell({
     <div
       role="button"
       tabIndex={0}
-      aria-label={`Sector ${x}, ${y}${isClaimed ? (isCurrentPlayer ? ' (Owned by you)' : ' (Occupied)') : ' (Unclaimed)'}`}
+      aria-label={`Cell ${x}, ${y}${
+        isClaimed ? (isCurrentPlayer ? ' — yours' : ' — taken') : ' — empty'
+      }`}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       onMouseEnter={() => onHover({ id, x, y, ownerId, ownerColor })}
@@ -73,24 +73,17 @@ export const GridCell = React.memo(function GridCell({
       style={style}
       data-value={isStrategic ? (cellValue ?? 1) : undefined}
       className={`
-        relative aspect-square rounded-[2px] transition-all duration-150 cursor-pointer select-none
-        ${!isClaimed ? 'bg-grid-cell border border-grid-line/50 hover:bg-grid-cell-hover hover:border-accent/90 hover:scale-110 hover:shadow-[0_0_8px_rgba(99,102,241,0.5)] hover:z-10' : ''}
-        ${isFrontier ? 'ring-1 ring-success/70 shadow-[0_0_6px_rgba(16,185,129,0.35)]' : ''}
-        ${isStrategic ? 'after:content-[attr(data-value)] after:absolute after:inset-0 after:flex after:items-center after:justify-center after:text-[8px] after:font-black after:text-warning' : ''}
-        ${isClaimed && isCurrentPlayer ? 'ring-1 ring-white/60 hover:brightness-110 hover:scale-105 hover:z-10' : ''}
+        relative aspect-square rounded-[3px] transition-[transform,background-color,box-shadow] duration-150 cursor-pointer select-none
+        ${!isClaimed ? 'bg-grid-cell hover:bg-grid-cell-hover hover:scale-[1.18] hover:z-10' : ''}
+        ${isFrontier ? 'ring-1 ring-accent/50' : ''}
+        ${isStrategic ? 'after:content-[attr(data-value)] after:absolute after:inset-0 after:flex after:items-center after:justify-center after:text-[8px] after:font-bold after:text-accent-glow' : ''}
+        ${isClaimed && isCurrentPlayer ? 'ring-1 ring-white/40 hover:brightness-110 hover:scale-105 hover:z-10' : ''}
         ${isClaimed && !isCurrentPlayer ? 'hover:brightness-110 hover:scale-105 hover:z-10' : ''}
-        ${isClaiming ? 'animate-pulse ring-2 ring-accent ring-offset-1 ring-offset-surface z-25 shadow-[0_0_12px_rgba(99,102,241,0.9)]' : ''}
-        ${isHighlighted ? 'ring-2 ring-white brightness-125 scale-110 z-20 shadow-[0_0_12px_rgba(255,255,255,0.85)]' : ''}
-        ${isDimmed ? 'opacity-30 brightness-75' : ''}
+        ${isClaiming ? 'ring-2 ring-accent z-20 scale-105' : ''}
+        ${isHighlighted ? 'ring-2 ring-white brightness-125 scale-110 z-20' : ''}
+        ${isDimmed ? 'opacity-25' : ''}
         ${animationClass}
       `}
-    >
-      {/* Subtle indicator for player's own cells */}
-      {isClaimed && isCurrentPlayer && (
-        <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="w-1 h-1 rounded-full bg-white opacity-80" />
-        </span>
-      )}
-    </div>
+    />
   );
 });

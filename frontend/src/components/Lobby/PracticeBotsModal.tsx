@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 
 interface PracticeBotsModalProps {
   isOpen: boolean;
@@ -8,17 +8,11 @@ interface PracticeBotsModalProps {
 }
 
 export function PracticeBotsModal({ isOpen, onClose, onDeployMultiplayer, onStartPractice }: PracticeBotsModalProps) {
-  const modalRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     if (!isOpen) return;
-
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
+      if (e.key === 'Escape') onClose();
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
@@ -29,88 +23,45 @@ export function PracticeBotsModal({ isOpen, onClose, onDeployMultiplayer, onStar
     <div
       role="dialog"
       aria-modal="true"
-      aria-labelledby="practice-briefing-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn"
+      aria-labelledby="practice-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div
-        ref={modalRef}
-        className="relative w-full max-w-lg bg-surface/95 border border-accent/60 rounded-2xl p-6 sm:p-8 shadow-2xl glow-accent flex flex-col gap-5"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-grid-line/60">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-accent/20 border border-accent flex items-center justify-center text-accent">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <div>
-              <h2 id="practice-briefing-title" className="text-lg font-black tracking-wide text-text-primary uppercase">
-                PRACTICE VS BOTS
-              </h2>
-              <span className="text-xs font-mono text-accent">
-                RIVAL-01 • MEDIUM AI
-              </span>
-            </div>
-          </div>
-
+      <div className="relative w-full max-w-sm bg-surface border border-grid-line rounded-2xl p-6 shadow-2xl shadow-black/50 flex flex-col gap-5 animate-pop-in">
+        <div className="flex items-center justify-between">
+          <h2 id="practice-title" className="font-display text-xl font-semibold text-text-primary">
+            Practice
+          </h2>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close practice briefing"
-            className="p-2 rounded-xl text-text-muted hover:text-text-primary hover:bg-surface-elevated border border-transparent hover:border-grid-line transition-all cursor-pointer"
+            aria-label="Close"
+            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-elevated transition-all cursor-pointer"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* Tactical Explanation */}
-        <div className="space-y-3 text-xs font-mono text-text-secondary leading-relaxed">
-          <div className="p-3 rounded-xl bg-surface-elevated/80 border border-grid-line/80 space-y-2">
-            <div className="text-text-primary font-bold uppercase tracking-wider flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-              GameSession Architecture Ready
-            </div>
-            <p className="font-sans text-xs text-text-secondary">
-              RIVAL-01 is a server-authoritative medium-difficulty commander on the current 25×25 battlefield.
-            </p>
-            <p className="font-sans text-xs text-text-secondary">
-              The bot uses the same turn, cooldown, atomic claim, and WebSocket event pipeline as human commanders.
-            </p>
-          </div>
+        <p className="text-sm text-text-secondary leading-relaxed">
+          Play a quick solo match against a bot to learn the ropes. Same rules, same turns — no pressure. When you&apos;re ready, invite a friend for a real match.
+        </p>
 
-          <p className="font-sans text-xs text-text-muted">
-            Practice claims stay isolated from global multiplayer territory and presence.
-          </p>
-        </div>
-
-        {/* Actions */}
-        <div className="flex flex-col sm:flex-row items-center justify-end gap-2.5 pt-3 border-t border-grid-line/60">
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl font-mono text-xs uppercase tracking-wider text-text-secondary hover:text-text-primary hover:bg-surface-elevated border border-grid-line/60 transition-all cursor-pointer"
-          >
-            Close
-          </button>
+        <div className="flex flex-col gap-2.5">
           <button
             type="button"
             onClick={onStartPractice}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider bg-warning hover:bg-warning/80 text-black shadow-md active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
+            className="w-full py-3.5 rounded-lg font-display font-semibold text-base bg-accent hover:bg-accent-glow text-[#231b09] active:scale-[0.98] transition-all cursor-pointer"
           >
-            Start Practice
+            Start practice
           </button>
           <button
             type="button"
             onClick={onDeployMultiplayer}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider bg-accent hover:bg-accent-glow text-white shadow-md hover:shadow-accent/40 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
+            className="w-full py-3 rounded-lg font-medium text-sm bg-surface-elevated border border-grid-line hover:border-accent/50 text-text-primary active:scale-[0.98] transition-all cursor-pointer"
           >
-            Play 2-Player Battle
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-            </svg>
+            Play against a friend instead
           </button>
         </div>
       </div>
