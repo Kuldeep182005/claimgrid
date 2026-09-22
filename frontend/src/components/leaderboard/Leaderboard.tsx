@@ -8,44 +8,28 @@ interface LeaderboardProps {
 }
 
 export function Leaderboard({ entries, currentUserId, onHoverPlayer }: LeaderboardProps) {
-  return (
-    <div className="bg-surface/80 border border-grid-line/80 hover:border-accent/40 rounded-2xl p-4 backdrop-blur-md shadow-xl flex flex-col h-full transition-all duration-200">
-      {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-grid-line/60 mb-3">
-        <div className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-warning" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-          </svg>
-          <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-text-primary">
-            LIVE FACTION STANDINGS
-          </h2>
-        </div>
-        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface-elevated text-text-muted border border-grid-line/50" title="Hover commander to spotlight territory">
-          SPOTLIGHT ON HOVER
-        </span>
-      </div>
+  if (entries.length === 0) return null;
 
-      {/* Ranked List */}
-      <div
-        onMouseLeave={() => onHoverPlayer?.(null)}
-        className="flex-1 overflow-y-auto space-y-1.5 pr-1 max-h-[360px]"
-      >
-        {entries.length === 0 ? (
-          <div className="text-center py-8 text-xs font-mono text-text-muted">
-            No territory claimed yet.
-            <br />
-            Be the first to secure a sector!
-          </div>
-        ) : (
-          entries.map((entry) => (
-            <LeaderboardItem
-              key={entry.id}
-              entry={entry}
-              isCurrentUser={entry.id === currentUserId}
-              onHover={onHoverPlayer}
-            />
-          ))
-        )}
+  return (
+    <div
+      onMouseLeave={() => onHoverPlayer?.(null)}
+      className="bg-[#FAF7F2] border-2 border-[#1E1B18] shadow-hard rounded-[8px] p-3 flex flex-col gap-1 w-full"
+    >
+      <div className="flex items-center justify-between pb-1.5 mb-1 border-b border-[#DCD5C8]">
+        <span className="font-display text-xs font-black uppercase tracking-wider text-[#1E1B18]">
+          Tournament Standings
+        </span>
+        <span className="text-[10px] text-[#6E675F] font-bold">TERRITORY</span>
+      </div>
+      <div className="flex flex-col gap-0.5 max-h-48 overflow-y-auto">
+        {entries.map((entry) => (
+          <LeaderboardItem
+            key={entry.id}
+            entry={entry}
+            isCurrentUser={entry.id === currentUserId}
+            onHover={onHoverPlayer}
+          />
+        ))}
       </div>
     </div>
   );

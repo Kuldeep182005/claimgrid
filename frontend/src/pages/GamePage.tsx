@@ -55,11 +55,12 @@ export function GamePage({ player, battle, onReturnToLobby, onSwitchPlayer }: Ga
       currentSession.players?.find((p) => p.id === currentSession.currentPlayerId)?.username
     : undefined;
 
-  const currentUserRank = leaderboard.find((e) => e.id === player.id)?.rank;
+  const isBattle = !!currentSession;
+  const isWaiting = currentSession?.status === 'WAITING';
 
   return (
-    <div className="min-h-screen bg-grid-bg flex flex-col tactical-scanline">
-      {/* Header */}
+    <div className="min-h-screen bg-[#F2EDE4] text-[#1E1B18] flex flex-col font-sans select-none">
+      {/* Printed tabletop header */}
       <GameHeader
         connectionState={connectionState}
         latencyMs={latencyMs}
@@ -74,62 +75,54 @@ export function GamePage({ player, battle, onReturnToLobby, onSwitchPlayer }: Ga
         onReturnToLobby={onReturnToLobby}
       />
 
-      {/* Floating Status Notification Toast */}
+      {/* Status banner toast — restrained printed notification */}
       {statusMessage && (
-        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all">
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
           <div
-            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold shadow-2xl border backdrop-blur-md flex items-center gap-2 ${
+            className={[
+              'px-3.5 py-1.5 rounded-[4px] border-2 border-[#1E1B18] shadow-hard text-xs font-mono font-bold',
               statusMessage.type === 'success'
-                ? 'bg-success/20 border-success text-success shadow-success/20'
+                ? 'bg-[#EDE7DC] text-[#2A6F4E]'
                 : statusMessage.type === 'warning'
-                ? 'bg-warning/20 border-warning text-warning shadow-warning/20'
-                : 'bg-danger/20 border-danger text-danger shadow-danger/20'
-            }`}
+                ? 'bg-[#EDE7DC] text-[#D97724]'
+                : 'bg-[#EDE7DC] text-[#D13428]',
+            ].join(' ')}
           >
-            {statusMessage.type === 'success' && (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-              </svg>
-            )}
-            {statusMessage.type === 'warning' && (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            )}
-            {statusMessage.type === 'error' && (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            )}
-            <span>{statusMessage.text}</span>
+            {statusMessage.text}
           </div>
         </div>
       )}
 
-      {/* Main Game Layout */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 flex flex-col lg:flex-row gap-5">
-        {/* Dominant Visual Centerpiece: The 25x25 (or 50x50) GameBoard */}
-        <section className="flex-1 min-w-0 flex flex-col relative" aria-label="Game Board">
-          {/* First-Time Player Tactical Directive Banner */}
-          {player.cellsClaimed === 0 && !currentSession && (
-            <div className="mb-3 px-4 py-2.5 rounded-xl bg-accent/15 border border-accent/40 backdrop-blur-md flex items-center justify-between gap-3 text-xs font-mono text-accent-glow animate-fadeIn shadow-lg">
-              <div className="flex items-center gap-2.5">
-                <span className="w-2 h-2 rounded-full bg-accent animate-ping shrink-0" />
-                <span className="font-bold text-text-primary uppercase tracking-wider">TACTICAL DIRECTIVE:</span>
-                <span>SELECT AN UNCLAIMED SECTOR TO DEPLOY YOUR FIRST CLAIM</span>
-              </div>
-              <span className="text-[11px] text-text-muted hidden md:inline font-sans">
-                (Click any dark cell to start)
-              </span>
-            </div>
-          )}
+      {/* Main Board Arena */}
+      <main className="flex-1 max-w-4xl w-full mx-auto px-3 sm:px-4 py-3 sm:py-4 flex flex-col gap-3 sm:gap-4">
+        {/* Waiting lobby banner */}
+        {isWaiting && (
+          <div className="bg-[#FAF7F2] border-2 border-[#1E1B18] shadow-hard-sm rounded-[6px] py-2 px-4 text-center text-xs font-display font-bold text-[#1E1B18] animate-pulse">
+            WAITING FOR OPPONENT TO JOIN ({currentSession?.players?.length ?? 1}/{currentSession?.maxPlayers ?? 2})…
+          </div>
+        )}
 
+        {/* Score & Territory Plates (dominant above the board) */}
+        <TacticalHUD
+          player={player}
+          rank={leaderboard.find((e) => e.id === player.id)?.rank}
+          totalCells={stats.totalCells}
+          isCooldownReady={cooldown.isReady}
+          cooldownProgress={cooldown.progress}
+          remainingCooldownSeconds={cooldown.remainingSeconds}
+          battleSession={currentSession}
+          isMyTurn={isMyTurn}
+          turnNumber={currentSession?.turnNumber}
+          onSwitchPlayer={onSwitchPlayer}
+        />
+
+        {/* The Grid — Visual Centerpiece */}
+        <section className="flex-1 min-w-0 flex flex-col items-center justify-center my-auto" aria-label="Game Board">
           {loading && cells.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center min-h-[460px] bg-surface/50 border border-grid-line/60 rounded-2xl">
-              <div className="w-10 h-10 border-3 border-accent border-t-transparent rounded-full animate-spin mb-4" />
-              <div className="text-sm font-mono text-text-muted">
-                {currentSession ? 'INITIALIZING AUTHORITATIVE 25×25 GRID...' : 'INITIALIZING AUTHORITATIVE GRID...'}
-              </div>
+            <div className="flex-1 flex items-center justify-center min-h-[380px]">
+              <span className="font-mono text-xs font-bold text-[#6E675F] bg-[#FAF7F2] px-3 py-1.5 border border-[#1E1B18] shadow-hard-sm rounded-[4px]">
+                INITIALIZING BOARD TILES…
+              </span>
             </div>
           ) : (
             <GameBoard
@@ -149,52 +142,44 @@ export function GamePage({ player, battle, onReturnToLobby, onSwitchPlayer }: Ga
           )}
         </section>
 
-        {/* Tactical Control Sidebar: HUD, Live Leaderboard & Live Battlefield Telemetry */}
-        <aside className="w-full lg:w-80 shrink-0 flex flex-col gap-4" aria-label="Tactical Status and Leaderboard">
-          <TacticalHUD
-            player={player}
-            rank={currentUserRank}
-            totalCells={stats.totalCells}
-            isCooldownReady={cooldown.isReady}
-            cooldownProgress={cooldown.progress}
-            remainingCooldownSeconds={cooldown.remainingSeconds}
-            battleSession={currentSession}
-            isMyTurn={isMyTurn}
-            turnNumber={currentSession?.turnNumber}
-            onSwitchPlayer={onSwitchPlayer}
-          />
+        {/* Below the board: Secondary Tournament Roster & Comms */}
+        <div className="flex flex-col sm:flex-row gap-3 max-w-2xl mx-auto w-full items-start">
+          {/* Leaderboard — shown in lobby or >2 players */}
+          {(!isBattle || (currentSession?.players?.length ?? 0) > 2) && (
+            <div className="w-full sm:w-1/2">
+              <Leaderboard
+                entries={leaderboard}
+                currentUserId={player.id}
+                onHoverPlayer={setHoveredPlayerId}
+              />
+            </div>
+          )}
 
-          <div className="shrink-0">
-            <Leaderboard
-              entries={leaderboard}
-              currentUserId={player.id}
-              onHoverPlayer={setHoveredPlayerId}
-            />
-          </div>
+          {/* Comms & Activity */}
+          <div className="flex flex-col gap-2.5 w-full flex-1">
+            {isBattle && (
+              <CommsPanel
+                messages={chatMessages}
+                reaction={reactionAnimation}
+                currentPlayerId={player.id}
+                disabled={!currentSession || currentSession.practice || currentSession.status !== 'ACTIVE'}
+                onSendMessage={sendChatMessage}
+                onSendReaction={sendReaction}
+              />
+            )}
 
-          <CommsPanel
-            messages={chatMessages}
-            reaction={reactionAnimation}
-            currentPlayerId={player.id}
-            disabled={!currentSession || currentSession.practice || currentSession.status !== 'ACTIVE'}
-            onSendMessage={sendChatMessage}
-            onSendReaction={sendReaction}
-          />
-
-          {/* Dedicated Live Battlefield Telemetry Panel (non-overlapping with grid) */}
-          <div className="p-3 rounded-2xl bg-surface/50 border border-grid-line/60 backdrop-blur-sm shadow-lg pointer-events-none select-none">
             <ActivityFeed items={activityFeed} />
           </div>
-        </aside>
+        </div>
       </main>
 
-      {/* In-Game How To Play Modal */}
+      {/* Rules Modal */}
       <HowToPlayModal
         isOpen={isHowToPlayOpen}
         onClose={() => setIsHowToPlayOpen(false)}
       />
 
-      {/* Game End Victory/Defeat Overlay (Part 18) */}
+      {/* Game End Overlay */}
       {currentSession && currentSession.status === 'FINISHED' && (
         <GameEndOverlay
           player={player}

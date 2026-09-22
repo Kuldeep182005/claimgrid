@@ -7,46 +7,32 @@ interface LeaderboardItemProps {
 }
 
 export function LeaderboardItem({ entry, isCurrentUser, onHover }: LeaderboardItemProps) {
-  const isTop3 = entry.rank <= 3;
-
   return (
     <div
       onMouseEnter={() => onHover?.(entry.id)}
       onMouseLeave={() => onHover?.(null)}
-      className={`group flex items-center justify-between p-2.5 rounded-xl border transition-all duration-150 text-sm cursor-pointer select-none ${
+      className={[
+        'flex items-center justify-between py-1.5 px-2.5 rounded-[5px] text-xs cursor-pointer select-none transition-all',
         isCurrentUser
-          ? 'bg-accent/10 border-accent/50 hover:border-accent'
-          : 'bg-surface-elevated/40 border-grid-line hover:bg-surface-elevated hover:border-accent/40'
-      }`}
+          ? 'bg-[#E4572E]/10 border border-[#1E1B18] font-bold'
+          : 'hover:bg-[#EAE3D5] border border-transparent',
+      ].filter(Boolean).join(' ')}
     >
-      <div className="flex items-center gap-2.5 min-w-0">
-        <span
-          className={`w-6 text-center shrink-0 tabular-nums font-semibold ${
-            isTop3 ? 'text-accent' : 'text-text-muted'
-          }`}
-        >
-          {entry.rank}
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="w-5 text-[11px] font-mono font-bold text-[#6E675F] shrink-0">
+          #{entry.rank}
         </span>
         <span
-          className="w-3.5 h-3.5 rounded-full shrink-0 ring-1 ring-white/20 group-hover:scale-110 transition-transform"
+          className="w-2.5 h-2.5 rounded-[2px] border border-[#1E1B18] shrink-0"
           style={{ backgroundColor: entry.color }}
         />
-        <span
-          className={`truncate transition-colors ${
-            isCurrentUser ? 'text-text-primary font-semibold' : 'text-text-secondary group-hover:text-text-primary'
-          }`}
-        >
-          {entry.username}
-          {isCurrentUser && <span className="ml-1.5 text-xs text-accent font-normal">you</span>}
+        <span className="text-[#1E1B18] truncate">
+          {entry.username} {isCurrentUser && '(You)'}
         </span>
       </div>
-
-      <div className="text-right shrink-0 ml-2 tabular-nums">
-        <span className="font-semibold text-text-primary group-hover:text-accent transition-colors">
-          {entry.cellsClaimed}
-        </span>
-        <span className="text-xs text-text-muted ml-1">pts</span>
-      </div>
+      <span className="font-mono font-extrabold text-[#1E1B18] text-xs ml-2 tabular-nums">
+        {entry.cellsClaimed} <span className="text-[10px] text-[#6E675F] font-normal">cells</span>
+      </span>
     </div>
   );
 }

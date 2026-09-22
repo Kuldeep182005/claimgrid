@@ -1,46 +1,53 @@
 import { useState, useEffect } from 'react';
+import { CloseIcon } from '../UI/Icons';
 
 interface HowToPlayModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const YOU = '#e8b44b';
-const RIVAL = '#6c8cff';
-
-const steps: Array<{ title: string; body: string }> = [
-  { title: 'Claim a cell', body: 'On your turn, tap any empty cell to make it yours.' },
-  { title: 'Take turns', body: 'You and your opponent alternate turns, one claim at a time.' },
-  { title: 'Grow your lead', body: 'Every cell you claim is a point. Most cells wins.' },
-];
-
 export function HowToPlayModal({ isOpen, onClose }: HowToPlayModalProps) {
-  const [demoCells, setDemoCells] = useState<Array<'neutral' | 'you' | 'rival'>>(() =>
-    Array.from({ length: 25 }, (_, i) => (i === 6 || i === 18 ? 'rival' : 'neutral'))
+  // 5x5 interactive board demo
+  const [demoCells, setDemoCells] = useState<Array<{ id: number; owner: 'neutral' | 'player' | 'rival' }>>(() =>
+    Array.from({ length: 25 }, (_, i) => ({
+      id: i,
+      owner: i === 6 ? 'rival' : i === 18 ? 'rival' : 'neutral',
+    }))
   );
-  const [hint, setHint] = useState('Tap any empty cell to try it');
+  const [demoMessage, setDemoMessage] = useState('Click any unclaimed paper tile to practice claiming it.');
 
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        onClose();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  const claim = (i: number) => {
-    if (demoCells[i] !== 'neutral') {
-      setHint('That one is taken — pick an empty cell');
+  const handleDemoCellClick = (id: number) => {
+    const cell = demoCells[id];
+    if (cell.owner !== 'neutral') {
+      setDemoMessage('That cell is already claimed! Choose an empty tile.');
       return;
     }
-    setDemoCells((prev) => prev.map((c, idx) => (idx === i ? 'you' : c)));
-    setHint('Nice — that cell is yours now');
+
+    setDemoCells((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, owner: 'player' } : c))
+    );
+    setDemoMessage('Tile stamped with your ink! Players take alternating turns.');
   };
 
-  const reset = () => {
-    setDemoCells(Array.from({ length: 25 }, (_, i) => (i === 6 || i === 18 ? 'rival' : 'neutral')));
-    setHint('Tap any empty cell to try it');
+  const handleResetDemo = () => {
+    setDemoCells(
+      Array.from({ length: 25 }, (_, i) => ({
+        id: i,
+        owner: i === 6 ? 'rival' : i === 18 ? 'rival' : 'neutral',
+      }))
+    );
+    setDemoMessage('Click any unclaimed paper tile to practice claiming it.');
   };
 
   if (!isOpen) return null;
@@ -49,77 +56,118 @@ export function HowToPlayModal({ isOpen, onClose }: HowToPlayModalProps) {
     <div
       role="dialog"
       aria-modal="true"
-      aria-labelledby="how-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      aria-labelledby="rules-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1E1B18]/40 animate-fadeIn"
     >
-      <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto bg-surface border border-grid-line rounded-2xl p-6 shadow-2xl shadow-black/50 flex flex-col gap-6 animate-pop-in">
-        <div className="flex items-center justify-between">
-          <h2 id="how-title" className="font-display text-xl font-semibold text-text-primary">
-            How to play
-          </h2>
+      <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto bg-[#FAF7F2] border-2 border-[#1E1B18] shadow-hard-xl rounded-[8px] p-5 text-[#1E1B18] flex flex-col gap-4">
+        {/* Header */}
+        <div className="flex items-center justify-between pb-2 border-b-2 border-[#1E1B18]">
+          <div>
+            <h2 id="rules-title" className="font-display text-lg font-black uppercase tracking-tight text-[#1E1B18]">
+              HOW TO PLAY
+            </h2>
+            <span className="text-[11px] font-medium text-[#6E675F]">
+              Rules of ClaimGrid Tabletop
+            </span>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
-            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-elevated transition-all cursor-pointer"
+            aria-label="Close rules"
+            className="btn-tactile-sm p-1 rounded-[4px] bg-[#FAF7F2] text-[#1E1B18] cursor-pointer"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <CloseIcon size={14} />
           </button>
         </div>
 
-        <ol className="flex flex-col gap-3">
-          {steps.map((step, i) => (
-            <li key={step.title} className="flex gap-3">
-              <span className="flex-shrink-0 w-7 h-7 rounded-full bg-accent/15 text-accent font-display font-semibold text-sm flex items-center justify-center">
-                {i + 1}
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-text-primary">{step.title}</p>
-                <p className="text-sm text-text-secondary">{step.body}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+        {/* 4 Printed Rules */}
+        <div className="flex flex-col gap-2 text-xs">
+          <div className="p-2.5 rounded-[5px] bg-[#EDE7DC] border border-[#1E1B18]">
+            <span className="font-display font-bold text-[#1E1B18] block mb-0.5 uppercase tracking-wide">
+              1. Find an Empty Cell
+            </span>
+            <span className="text-[#6E675F] text-[11px]">
+              Scan the printed board for available neutral tiles.
+            </span>
+          </div>
 
-        {/* Interactive try-it board */}
-        <div className="rounded-xl bg-grid-bg border border-grid-line p-4 flex flex-col items-center gap-3">
-          <div className="w-full flex items-center justify-between">
-            <span className="text-xs font-medium text-text-secondary">Try it</span>
-            <button type="button" onClick={reset} className="text-xs text-text-muted hover:text-text-primary transition-colors cursor-pointer">
+          <div className="p-2.5 rounded-[5px] bg-[#EDE7DC] border border-[#1E1B18]">
+            <span className="font-display font-bold text-[#1E1B18] block mb-0.5 uppercase tracking-wide">
+              2. Claim It
+            </span>
+            <span className="text-[#6E675F] text-[11px]">
+              Stamp your ink onto the cell. Once locked, it cannot be stolen.
+            </span>
+          </div>
+
+          <div className="p-2.5 rounded-[5px] bg-[#EDE7DC] border border-[#1E1B18]">
+            <span className="font-display font-bold text-[#1E1B18] block mb-0.5 uppercase tracking-wide">
+              3. Expand Your Territory
+            </span>
+            <span className="text-[#6E675F] text-[11px]">
+              Players alternate turns claiming space across the shared grid.
+            </span>
+          </div>
+
+          <div className="p-2.5 rounded-[5px] bg-[#EDE7DC] border border-[#1E1B18]">
+            <span className="font-display font-bold text-[#1E1B18] block mb-0.5 uppercase tracking-wide">
+              4. Outscore Your Opponent
+            </span>
+            <span className="text-[#6E675F] text-[11px]">
+              The player who controls the majority share of the board wins.
+            </span>
+          </div>
+        </div>
+
+        {/* Interactive 5x5 Practice Board */}
+        <div className="flex flex-col items-center gap-2 p-3 bg-[#EDE7DC] border-2 border-[#1E1B18] rounded-[6px]">
+          <div className="flex items-center justify-between w-full text-[10px] font-mono font-bold text-[#6E675F]">
+            <span>PRACTICE STAMP</span>
+            <button
+              type="button"
+              onClick={handleResetDemo}
+              className="underline hover:text-[#1E1B18] cursor-pointer"
+            >
               Reset
             </button>
           </div>
-          <div className="grid grid-cols-5 gap-1.5">
-            {demoCells.map((owner, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => claim(i)}
-                aria-label={`Cell ${i + 1}`}
-                className="w-10 h-10 rounded-md transition-transform active:scale-90 cursor-pointer"
-                style={{
-                  backgroundColor:
-                    owner === 'you' ? YOU : owner === 'rival' ? RIVAL : 'var(--color-grid-cell)',
-                }}
-              />
-            ))}
+
+          <div
+            className="grid grid-cols-5 gap-1 p-1.5 rounded-[4px] bg-[#FAF7F2] border border-[#1E1B18]"
+            style={{ width: '150px', height: '150px' }}
+          >
+            {demoCells.map((c) => {
+              const isPlayer = c.owner === 'player';
+              const isRival = c.owner === 'rival';
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => handleDemoCellClick(c.id)}
+                  aria-label={`Demo tile ${c.id}`}
+                  className={[
+                    'aspect-square rounded-[2px] transition-all duration-75 cursor-pointer',
+                    c.owner === 'neutral' && 'bg-[#FAF7F2] border border-[#DCD5C8] hover:bg-[#EAE3D5]',
+                    isPlayer && 'bg-[#E4572E] border border-[#1E1B18] animate-claim-cell',
+                    isRival && 'bg-[#1F3A5F] border border-[#1E1B18] pattern-hatch',
+                  ].filter(Boolean).join(' ')}
+                />
+              );
+            })}
           </div>
-          <div className="flex items-center gap-4 text-xs text-text-muted">
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ backgroundColor: YOU }} /> You</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ backgroundColor: RIVAL }} /> Opponent</span>
-          </div>
-          <p className="text-xs text-text-secondary" aria-live="polite">{hint}</p>
+
+          <span className="text-[11px] font-mono text-center text-[#1E1B18] font-bold">
+            {demoMessage}
+          </span>
         </div>
 
+        {/* Dismiss Button */}
         <button
           type="button"
           onClick={onClose}
-          className="w-full py-3.5 rounded-lg font-display font-semibold text-base bg-accent hover:bg-accent-glow text-[#231b09] active:scale-[0.98] transition-all cursor-pointer"
+          className="btn-tactile w-full py-2.5 rounded-[6px] font-display font-black text-xs uppercase bg-[#E4572E] text-white tracking-wider cursor-pointer"
         >
-          Got it
+          GOT IT — LET&apos;S PLAY
         </button>
       </div>
     </div>

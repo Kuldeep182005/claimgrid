@@ -15,104 +15,89 @@ export function GameEndOverlay({ player, battleSession, onReturnToLobby }: GameE
     (a, b) => (b.score ?? b.cellsClaimed) - (a.score ?? a.cellsClaimed)
   );
 
+  const opponent = rankedPlayers.find((p) => p.id !== player.id);
+
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="game-end-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1E1B18]/40 animate-fadeIn"
     >
-      <div className="relative w-full max-w-md bg-surface/95 border border-grid-line/90 rounded-2xl p-6 sm:p-8 shadow-2xl glow-accent text-center flex flex-col gap-6">
+      {/* Tactile printed result plate — keeps board clearly visible behind */}
+      <div className="relative w-full max-w-sm bg-[#FAF7F2] border-2 border-[#1E1B18] shadow-hard-xl rounded-[8px] p-6 text-center flex flex-col gap-5">
         {/* Outcome Header */}
-        <div className="space-y-2">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mx-auto mb-2 bg-surface-elevated border border-grid-line shadow-inner">
-            {isVictory ? (
-              <span className="text-3xl">🏆</span>
-            ) : isDraw ? (
-              <span className="text-3xl">⚖️</span>
-            ) : (
-              <span className="text-3xl">💀</span>
-            )}
-          </div>
-
+        <div>
+          <span className="font-mono text-[10px] font-bold text-[#6E675F] tracking-wider uppercase">
+            MATCH CONCLUDED
+          </span>
           <h2
             id="game-end-title"
-            className={`text-3xl sm:text-4xl font-black font-mono tracking-wider uppercase ${
-              isVictory ? 'text-success' : isDraw ? 'text-warning' : 'text-danger'
-            }`}
+            className="font-display text-4xl font-extrabold tracking-tight text-[#1E1B18] mt-1"
           >
-            {isVictory ? 'VICTORY' : isDraw ? 'DRAW' : 'DEFEAT'}
+            {isVictory ? 'YOU WIN' : isDraw ? 'DRAW' : 'GAME OVER'}
           </h2>
-
-          <p className="text-xs font-mono text-text-muted">
+          <p className="text-xs text-[#6E675F] mt-1">
             {isVictory
-              ? 'GRID SECURED • SECTOR DOMINANCE ACHIEVED'
+              ? 'Territory conquered. Full grid control secured.'
               : isDraw
-              ? 'STALEMATE • EQUAL TERRITORY CONTROL'
-              : 'GRID OVERRUN • DEPLOY COUNTER-OFFENSIVE'}
+              ? 'Contested battleground ended in a stalemate.'
+              : 'Opponent claimed the majority share of the board.'}
           </p>
         </div>
 
-        {/* Final Standings (Supports 2 or 4 Players) */}
-        <div className="flex flex-col gap-2 bg-surface-elevated/70 border border-grid-line/60 rounded-xl p-4">
-          <div className="text-[11px] font-mono text-text-muted uppercase tracking-wider text-left pb-1 border-b border-grid-line/40">
-            FINAL STANDINGS
+        {/* Territory Comparison Box */}
+        <div className="bg-[#EDE7DC] border-2 border-[#1E1B18] rounded-[6px] p-3 flex flex-col gap-2">
+          {/* Your Territory */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span
+                className="w-3.5 h-3.5 rounded-[2px] border border-[#1E1B18] shrink-0"
+                style={{ backgroundColor: player.color || '#E4572E' }}
+              />
+              <span className="text-xs font-bold text-[#1E1B18]">Your Territory</span>
+            </div>
+            <span className="font-display font-extrabold text-xl tabular-nums text-[#1E1B18]">
+              {player.cellsClaimed} <span className="text-[10px] text-[#6E675F]">cells</span>
+            </span>
           </div>
-          <div className="flex flex-col gap-2">
-            {rankedPlayers.map((p, idx) => {
-              const isSelf = p.id === player.id;
-              const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '4️⃣';
-              const score = p.score ?? p.cellsClaimed;
 
-              return (
-                <div
-                  key={p.id}
-                  className={`flex items-center justify-between p-2.5 rounded-lg border transition-all ${
-                    isSelf
-                      ? 'bg-surface-elevated border-accent/60 shadow-sm'
-                      : 'bg-surface/50 border-grid-line/40'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="text-base shrink-0">{medal}</span>
-                    <span
-                      className="w-3 h-3 rounded-full shrink-0 shadow-sm ring-1 ring-white/20"
-                      style={{ backgroundColor: p.color }}
-                    />
-                    <div className="min-w-0 flex items-center gap-1.5">
-                      <span className="font-bold text-xs text-text-primary truncate">
-                        {p.username}
-                      </span>
-                      {isSelf && (
-                        <span className="text-[9px] font-mono font-black uppercase px-1 py-0.2 rounded bg-accent/20 text-accent border border-accent/30">
-                          YOU
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-[11px] font-mono text-text-muted">
-                      {p.cellsClaimed} {p.cellsClaimed === 1 ? 'cell' : 'cells'}
-                    </span>
-                    <span className="font-black font-mono text-xs text-accent">
-                      {score} PTS
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          {/* Opponent Territory */}
+          {opponent && (
+            <div className="flex items-center justify-between border-t border-[#DCD5C8] pt-2">
+              <div className="flex items-center gap-2">
+                <span
+                  className="w-3.5 h-3.5 rounded-[2px] border border-[#1E1B18] pattern-hatch shrink-0"
+                  style={{ backgroundColor: opponent.color || '#1F3A5F' }}
+                />
+                <span className="text-xs font-bold text-[#1E1B18] truncate max-w-[120px]">
+                  {opponent.username}
+                </span>
+              </div>
+              <span className="font-display font-extrabold text-xl tabular-nums text-[#1E1B18]">
+                {opponent.cellsClaimed} <span className="text-[10px] text-[#6E675F]">cells</span>
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Action Button */}
-        <button
-          type="button"
-          onClick={onReturnToLobby}
-          className="w-full py-3.5 px-6 rounded-xl font-bold text-sm tracking-wider uppercase bg-accent hover:bg-accent-glow text-white shadow-lg hover:shadow-accent/40 active:scale-[0.97] transition-all cursor-pointer flex items-center justify-center gap-2"
-        >
-          RETURN TO LOBBY
-        </button>
+        {/* Action Controls */}
+        <div className="flex flex-col gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onReturnToLobby}
+            className="btn-tactile w-full py-2.5 rounded-[6px] font-display font-black text-sm bg-[#E4572E] text-white tracking-wide cursor-pointer"
+          >
+            PLAY AGAIN
+          </button>
+          <button
+            type="button"
+            onClick={onReturnToLobby}
+            className="btn-tactile w-full py-2 rounded-[6px] font-display font-bold text-xs bg-[#FAF7F2] text-[#1E1B18] cursor-pointer"
+          >
+            HOME
+          </button>
+        </div>
       </div>
     </div>
   );
